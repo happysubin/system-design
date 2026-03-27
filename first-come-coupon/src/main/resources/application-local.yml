@@ -1,0 +1,8 @@
+spring:
+  docker:
+    compose:
+      enabled: true
+      lifecycle-management: start-and-stop
+  jpa:
+    hibernate:
+      ddl-auto: update

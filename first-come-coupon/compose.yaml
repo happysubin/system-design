@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: first-come-coupon-postgres
+    environment:
+      POSTGRES_DB: first_come_coupon
+      POSTGRES_USER: coupon_user
+      POSTGRES_PASSWORD: coupon_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coupon_user -d first_come_coupon"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7.4
+    container_name: first-come-coupon-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  postgres-data:
