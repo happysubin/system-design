@@ -1,3 +1,4 @@
+import io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
@@ -7,9 +8,13 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
-repositories {
-    mavenCentral()
+
+allprojects {
+    repositories {
+        mavenCentral()
+    }
 }
+
 
 java {
     toolchain {
@@ -23,8 +28,11 @@ kotlin {
     }
 }
 
+
+
+
 subprojects {
-    group = "com"
+    group = "com.library"
     version = "0.0.1-SNAPSHOT"
     description = "library-search"
 
@@ -41,6 +49,14 @@ subprojects {
         testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
         testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
         testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    }
+
+    val springCloudVersion = "2025.1.0"
+
+    configure<DependencyManagementExtension> {
+        imports {
+            mavenBom("org.springframework.cloud:spring-cloud-dependencies:$springCloudVersion")
+        }
     }
 
     tasks.withType<Test> {
