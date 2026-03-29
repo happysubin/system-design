@@ -1,8 +1,13 @@
-package com.firstcomecoupon.serivce
+package com.firstcomecoupon.coupon.application
 
-import com.firstcomecoupon.domain.Coupon
-import com.firstcomecoupon.domain.CouponIssue
-import com.firstcomecoupon.domain.Member
+import com.firstcomecoupon.coupon.application.CouponClaimCompensationHandler
+import com.firstcomecoupon.coupon.application.CouponClaimFinalizer
+import com.firstcomecoupon.coupon.domain.Coupon
+import com.firstcomecoupon.coupon.domain.CouponClaimResult
+import com.firstcomecoupon.coupon.domain.CouponIssue
+import com.firstcomecoupon.coupon.domain.CouponSoldOutException
+import com.firstcomecoupon.coupon.domain.Member
+import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimRedisGate
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
@@ -55,6 +60,18 @@ class CouponClaimCompensationHandlerTest {
     }
 
     @Test
+    fun `rolls back redis and returns sold out when sql capacity is exhausted`() {
+        val handler = CouponClaimCompensationHandler(couponClaimFinalizer, couponClaimRedisGate)
+
+        given(couponClaimFinalizer.finalizeClaim(1L, 1L)).willThrow(CouponSoldOutException())
+
+        val result = handler.finalizeClaim(1L, 1L)
+
+        assertTrue(result is CouponClaimResult.SoldOut)
+        verify(couponClaimRedisGate).rollback(1L, 1L)
+    }
+
+    @Test
     fun `rolls back redis and rethrows unexpected runtime exception`() {
         val handler = CouponClaimCompensationHandler(couponClaimFinalizer, couponClaimRedisGate)
 
@@ -71,7 +88,6 @@ class CouponClaimCompensationHandlerTest {
         id = 1L,
         name = "선착순 쿠폰",
         totalQuantity = 100,
-        issuedQuantity = 0,
         issueStartAt = LocalDateTime.now().minusHours(1),
         issueEndAt = LocalDateTime.now().plusHours(1),
     )

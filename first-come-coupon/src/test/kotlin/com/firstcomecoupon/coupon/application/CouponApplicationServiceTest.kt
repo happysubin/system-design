@@ -1,8 +1,9 @@
-package com.firstcomecoupon.serivce
+package com.firstcomecoupon.coupon.application
 
-import com.firstcomecoupon.controller.dto.CreateCouponRequest
-import com.firstcomecoupon.domain.Coupon
-import com.firstcomecoupon.repository.CouponRepository
+import com.firstcomecoupon.coupon.api.dto.CreateCouponRequest
+import com.firstcomecoupon.coupon.application.CouponApplicationService
+import com.firstcomecoupon.coupon.domain.Coupon
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.ArgumentCaptor
@@ -14,10 +15,11 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import java.time.LocalDateTime
+import kotlin.reflect.full.memberProperties
 import kotlin.test.assertEquals
 
 @ExtendWith(MockitoExtension::class)
-class CouponServiceTest {
+class CouponApplicationServiceTest {
 
     @Mock
     lateinit var couponRepository: CouponRepository
@@ -40,12 +42,11 @@ class CouponServiceTest {
             id = 1L,
             name = request.name,
             totalQuantity = request.totalQuantity,
-            issuedQuantity = 0,
             issueStartAt = request.issueStartAt,
             issueEndAt = request.issueEndAt,
             createdAt = LocalDateTime.of(2026, 3, 27, 22, 0),
         )
-        val service = CouponService(couponRepository, stringRedisTemplate)
+        val service = CouponApplicationService(couponRepository, stringRedisTemplate)
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations)
         given(couponRepository.save(org.mockito.ArgumentMatchers.any(Coupon::class.java))).willReturn(savedCoupon)
@@ -58,17 +59,16 @@ class CouponServiceTest {
 
         assertEquals(request.name, couponToSave.name)
         assertEquals(request.totalQuantity, couponToSave.totalQuantity)
-        assertEquals(0, couponToSave.issuedQuantity)
         assertEquals(request.issueStartAt, couponToSave.issueStartAt)
         assertEquals(request.issueEndAt, couponToSave.issueEndAt)
 
         assertEquals(savedCoupon.id, response.id)
         assertEquals(savedCoupon.name, response.name)
         assertEquals(savedCoupon.totalQuantity, response.totalQuantity)
-        assertEquals(savedCoupon.issuedQuantity, response.issuedQuantity)
         assertEquals(savedCoupon.issueStartAt, response.issueStartAt)
         assertEquals(savedCoupon.issueEndAt, response.issueEndAt)
         assertEquals(savedCoupon.createdAt, response.createdAt)
+        assertEquals(false, response::class.memberProperties.any { it.name == "issuedQuantity" })
     }
 
     @Test
@@ -83,11 +83,10 @@ class CouponServiceTest {
             id = 7L,
             name = request.name,
             totalQuantity = request.totalQuantity,
-            issuedQuantity = 0,
             issueStartAt = request.issueStartAt,
             issueEndAt = request.issueEndAt,
         )
-        val service = CouponService(couponRepository, stringRedisTemplate)
+        val service = CouponApplicationService(couponRepository, stringRedisTemplate)
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations)
         given(couponRepository.save(org.mockito.ArgumentMatchers.any(Coupon::class.java))).willReturn(savedCoupon)

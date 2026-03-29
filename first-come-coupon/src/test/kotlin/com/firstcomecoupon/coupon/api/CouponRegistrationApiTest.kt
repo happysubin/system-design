@@ -1,6 +1,6 @@
-package com.firstcomecoupon.controller
+package com.firstcomecoupon.coupon.api
 
-import com.firstcomecoupon.repository.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.BDDMockito.given
@@ -64,7 +64,7 @@ class CouponRegistrationApiTest {
             .andExpect(jsonPath("$.id").isNumber)
             .andExpect(jsonPath("$.name").value("선착순 쿠폰"))
             .andExpect(jsonPath("$.totalQuantity").value(100))
-            .andExpect(jsonPath("$.issuedQuantity").value(0))
+            .andExpect(jsonPath("$.issuedQuantity").doesNotExist())
 
         val savedCoupon = couponRepository.findAll().single()
 
@@ -95,7 +95,6 @@ class CouponRegistrationApiTest {
         org.junit.jupiter.api.Assertions.assertAll(
             { org.junit.jupiter.api.Assertions.assertEquals("오픈 기념 쿠폰", savedCoupon.name) },
             { org.junit.jupiter.api.Assertions.assertEquals(50, savedCoupon.totalQuantity) },
-            { org.junit.jupiter.api.Assertions.assertEquals(0, savedCoupon.issuedQuantity) },
             { org.junit.jupiter.api.Assertions.assertEquals(java.time.LocalDateTime.of(2026, 4, 1, 9, 0), savedCoupon.issueStartAt) },
             { org.junit.jupiter.api.Assertions.assertEquals(java.time.LocalDateTime.of(2026, 4, 2, 9, 0), savedCoupon.issueEndAt) },
         )

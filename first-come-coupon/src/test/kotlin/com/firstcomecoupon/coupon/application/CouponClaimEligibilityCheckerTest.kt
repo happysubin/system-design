@@ -1,9 +1,12 @@
-package com.firstcomecoupon.serivce
+package com.firstcomecoupon.coupon.application
 
-import com.firstcomecoupon.domain.Coupon
-import com.firstcomecoupon.domain.Member
-import com.firstcomecoupon.repository.CouponRepository
-import com.firstcomecoupon.repository.MemberRepository
+import com.firstcomecoupon.coupon.application.CouponClaimEligibilityChecker
+import com.firstcomecoupon.coupon.application.CouponClaimEligibilityResult
+import com.firstcomecoupon.coupon.domain.Coupon
+import com.firstcomecoupon.coupon.domain.CouponClaimResult
+import com.firstcomecoupon.coupon.domain.Member
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.BDDMockito.given
@@ -58,7 +61,6 @@ class CouponClaimEligibilityCheckerTest {
             id = 1L,
             name = "future coupon",
             totalQuantity = 100,
-            issuedQuantity = 0,
             issueStartAt = LocalDateTime.now().plusHours(1),
             issueEndAt = LocalDateTime.now().plusHours(2),
         )
@@ -95,7 +97,6 @@ class CouponClaimEligibilityCheckerTest {
         id = 1L,
         name = "선착순 쿠폰",
         totalQuantity = 100,
-        issuedQuantity = 0,
         issueStartAt = LocalDateTime.now().minusHours(1),
         issueEndAt = LocalDateTime.now().plusHours(1),
     )

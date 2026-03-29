@@ -1,12 +1,13 @@
-package com.firstcomecoupon.controller
+package com.firstcomecoupon.coupon.api
 
-import com.firstcomecoupon.domain.Coupon
-import com.firstcomecoupon.domain.Member
-import com.firstcomecoupon.repository.CouponIssueRepository
-import com.firstcomecoupon.repository.CouponRepository
-import com.firstcomecoupon.repository.MemberRepository
-import com.firstcomecoupon.serivce.CouponClaimGateResult
-import com.firstcomecoupon.serivce.CouponClaimRedisGate
+import com.firstcomecoupon.coupon.domain.Coupon
+import com.firstcomecoupon.coupon.domain.CouponIssue
+import com.firstcomecoupon.coupon.domain.Member
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponIssueRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
+import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimGateResult
+import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimRedisGate
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -71,7 +72,6 @@ class CouponClaimApiTest {
             .andExpect(jsonPath("$.issueId").isNumber)
 
         assertEquals(1, couponIssueRepository.count())
-        assertEquals(0, couponRepository.findById(coupon.id).orElseThrow().issuedQuantity)
     }
 
     @Test
@@ -90,7 +90,6 @@ class CouponClaimApiTest {
             .andExpect(jsonPath("$.result").value("SOLD_OUT"))
 
         assertEquals(0, couponIssueRepository.count())
-        assertEquals(0, couponRepository.findById(coupon.id).orElseThrow().issuedQuantity)
     }
 
     @Test
@@ -119,10 +118,37 @@ class CouponClaimApiTest {
         verify(couponClaimRedisGate, times(1)).rollback(coupon.id, member.id)
     }
 
+    @Test
+    fun `returns sold out when sql capacity guard rejects claim after redis pass`() {
+        val coupon = couponRepository.save(
+            Coupon(
+                name = "선착순 쿠폰",
+                totalQuantity = 1,
+                issueStartAt = LocalDateTime.now().minusHours(1),
+                issueEndAt = LocalDateTime.now().plusHours(1),
+            ),
+        )
+        val member1 = memberRepository.save(Member(email = "one@test.com", name = "one"))
+        val member2 = memberRepository.save(Member(email = "two@test.com", name = "two"))
+
+        couponIssueRepository.saveAndFlush(CouponIssue(coupon = coupon, member = member1))
+        given(couponClaimRedisGate.tryClaim(coupon.id, member2.id)).willReturn(CouponClaimGateResult.PASSED)
+
+        mockMvc.perform(
+            post("/api/v1/coupons/{couponId}/claim", coupon.id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"memberId": ${member2.id}}"""),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.result").value("SOLD_OUT"))
+
+        assertEquals(1, couponIssueRepository.count())
+        verify(couponClaimRedisGate, times(1)).rollback(coupon.id, member2.id)
+    }
+
     private fun activeCoupon(): Coupon = Coupon(
         name = "선착순 쿠폰",
         totalQuantity = 100,
-        issuedQuantity = 0,
         issueStartAt = LocalDateTime.now().minusHours(1),
         issueEndAt = LocalDateTime.now().plusHours(1),
     )
