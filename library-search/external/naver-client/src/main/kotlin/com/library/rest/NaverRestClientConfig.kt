@@ -12,7 +12,7 @@ class NaverRestClientConfig(
 ) {
 
     @Bean
-    fun naverRestClient(): RestClient {
+    fun restClient(): RestClient {
         val restClient = RestClient
             .builder()
             .baseUrl(naverProperties.url)

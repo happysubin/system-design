@@ -1,5 +1,7 @@
 package com.library.unit
 
+import com.library.ApplicationException
+import com.library.ErrorType
 import com.library.NaverErrorResponse
 import com.library.feign.NaverErrorDecoder
 import feign.Request
@@ -8,6 +10,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions
+import org.springframework.http.HttpStatus
 import tools.jackson.databind.json.JsonMapper
 
 class NaverErrorDecoderTest: StringSpec({
@@ -26,10 +29,15 @@ class NaverErrorDecoderTest: StringSpec({
             .request(Request.create(Request.HttpMethod.GET, "/error", mapOf<String, Collection<String>>(), null, null, null))
             .build()
 
-        Assertions.assertThatThrownBy {
+        val throwable = Assertions.catchThrowable {
             errorDecoder.decode("methodKey", response)
         }
-            .isInstanceOf(RuntimeException::class.java)
-            .hasMessageContaining("error!!")
+
+        Assertions.assertThat(throwable).isExactlyInstanceOf(ApplicationException::class.java)
+
+        val exception = throwable as ApplicationException
+        Assertions.assertThat(exception.errorMessage).isEqualTo("error!!")
+        Assertions.assertThat(exception.errorType).isEqualTo(ErrorType.EXTERNAL_API_ERROR)
+        Assertions.assertThat(exception.httpStatus).isEqualTo(HttpStatus.BAD_REQUEST)
     }
 })

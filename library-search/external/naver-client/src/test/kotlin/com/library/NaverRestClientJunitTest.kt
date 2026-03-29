@@ -3,6 +3,7 @@ package com.library
 import com.library.rest.NaverRestClient
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.ComponentScan
@@ -15,7 +16,7 @@ class NaverRestClientJunitTest {
     @Autowired
     lateinit var naverClient: NaverRestClient
 
-    @ConfigurationPropertiesScan
+    @ConfigurationPropertiesScan(basePackages = ["com.library"])
     @ComponentScan
     class TestConfig
 
