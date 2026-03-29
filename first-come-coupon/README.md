@@ -108,5 +108,7 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 
 - Redis는 빠른 admission gate로 사용하고, 최종 정합성은 SQL에서 보장한다.
 - 중복 발급 방지는 Redis 1차 제어 + SQL unique 제약조건으로 이중 방어한다.
-- 발급 성공의 동기식 최종 근거는 `CouponIssue` 저장이며, `Coupon.issuedQuantity`는 성공 요청마다 즉시 갱신하지 않는다.
+- 발급 성공의 SQL truth는 `CouponIssue` 이력이다.
+- 발급 수와 남은 수량 조회는 `CouponIssue` aggregate와 `totalQuantity`를 기준으로 계산한다.
+- Redis stock은 runtime gate 용도이며, startup/periodic reconciliation로 SQL truth와 다시 맞춘다.
 - 구현은 먼저 정합성을 만족시키는 방향으로 진행하고, 이후 성능 최적화를 추가한다.

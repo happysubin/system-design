@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Reduce successful claim-path SQL work so the request path persists only `CouponIssue` and no longer updates `Coupon.issuedQuantity` synchronously.
+**Goal:** Reduce successful claim-path SQL work so the request path persists only `CouponIssue`.
 
-**Architecture:** Keep the current Redis gate and SQL final truth model. A successful claim should still insert one `CouponIssue`, but the hot path should stop mutating the shared `Coupon` row on every success. This removes the extra shared-row update while preserving duplicate protection and Redis rollback behavior.
+**Architecture:** Keep the current Redis gate and SQL final truth model. A successful claim should still insert one `CouponIssue`, but the hot path should stop mutating the shared `Coupon` row on every success. This removes the extra shared-row update while preserving duplicate protection and Redis rollback behavior, and it prepares the system to derive issued counts from `CouponIssue` instead of a coupon-level counter.
 
 **Tech Stack:** Spring Boot 4, Kotlin, Spring MVC, Spring Data JPA, Spring Data Redis, PostgreSQL, H2, MockMvc, Mockito.
 
@@ -17,9 +17,7 @@
 - Create: `src/test/kotlin/com/firstcomecoupon/serivce/CouponClaimFinalizerTest.kt`
 
 **Step 1: Write the failing integration expectation**
-- Update the success-path API test to expect:
-  - one `CouponIssue` row inserted
-  - `Coupon.issuedQuantity` remains `0`
+- Update the success-path API test to expect one `CouponIssue` row inserted without any coupon-level counter update.
 
 **Step 2: Run integration test to verify it fails**
 - Run: `./gradlew test --tests com.firstcomecoupon.controller.CouponClaimApiTest`
@@ -55,7 +53,7 @@
 
 **Step 1: Clarify synchronous success semantics**
 - Document that the request path now persists `CouponIssue` only
-- Clarify that `issuedQuantity` is no longer maintained on every successful claim
+- Clarify that coupon-level issued counts should be derived from `CouponIssue`
 
 ### Task 4: Final verification
 
