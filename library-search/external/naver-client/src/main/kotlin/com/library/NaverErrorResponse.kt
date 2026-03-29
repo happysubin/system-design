@@ -1,6 +1,6 @@
 package com.library
 
-class NaverErrorResponse(
+data class NaverErrorResponse(
     val errorMessage: String,
     val errorCode: String,
 )

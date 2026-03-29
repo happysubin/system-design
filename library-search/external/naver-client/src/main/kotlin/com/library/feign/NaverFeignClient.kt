@@ -17,5 +17,5 @@ interface NaverFeignClient {
         @RequestParam("display") display: Int,
         @RequestParam("start") start: Int,
         @RequestParam("sort") sort: String,
-    ): String
+    ): NaverBookSearchResponse
 }
