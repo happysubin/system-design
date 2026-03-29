@@ -1,6 +1,6 @@
-package com.firstcomecoupon.repository
+package com.firstcomecoupon.coupon.infrastructure.persistence
 
-import com.firstcomecoupon.domain.Member
+import com.firstcomecoupon.coupon.domain.Member
 import org.springframework.data.jpa.repository.JpaRepository
 
 interface MemberRepository : JpaRepository<Member, Long>

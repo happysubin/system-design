@@ -1,4 +1,4 @@
-package com.firstcomecoupon.controller.dto
+package com.firstcomecoupon.coupon.api.dto
 
 import java.time.LocalDateTime
 

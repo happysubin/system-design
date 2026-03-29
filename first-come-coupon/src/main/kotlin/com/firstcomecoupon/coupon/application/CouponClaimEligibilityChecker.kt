@@ -1,9 +1,10 @@
-package com.firstcomecoupon.serivce
+package com.firstcomecoupon.coupon.application
 
-import com.firstcomecoupon.domain.Coupon
-import com.firstcomecoupon.domain.Member
-import com.firstcomecoupon.repository.CouponRepository
-import com.firstcomecoupon.repository.MemberRepository
+import com.firstcomecoupon.coupon.domain.Coupon
+import com.firstcomecoupon.coupon.domain.CouponClaimResult
+import com.firstcomecoupon.coupon.domain.Member
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 

@@ -1,10 +1,13 @@
-package com.firstcomecoupon.serivce
+package com.firstcomecoupon.coupon.application
 
-import com.firstcomecoupon.controller.dto.IssueCouponRequest
+import com.firstcomecoupon.coupon.api.dto.IssueCouponRequest
+import com.firstcomecoupon.coupon.domain.CouponClaimResult
+import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimGateResult
+import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimRedisGate
 import org.springframework.stereotype.Service
 
 @Service
-class CouponClaimService(
+class CouponClaimApplicationService(
     private val couponClaimEligibilityChecker: CouponClaimEligibilityChecker,
     private val couponClaimRedisGate: CouponClaimRedisGate,
     private val couponClaimCompensationHandler: CouponClaimCompensationHandler,

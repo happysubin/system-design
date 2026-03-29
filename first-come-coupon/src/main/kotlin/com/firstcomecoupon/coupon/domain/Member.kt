@@ -1,4 +1,4 @@
-package com.firstcomecoupon.domain
+package com.firstcomecoupon.coupon.domain
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

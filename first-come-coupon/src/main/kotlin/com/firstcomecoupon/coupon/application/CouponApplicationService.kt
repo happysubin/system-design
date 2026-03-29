@@ -1,15 +1,15 @@
-package com.firstcomecoupon.serivce
+package com.firstcomecoupon.coupon.application
 
-import com.firstcomecoupon.controller.dto.CreateCouponRequest
-import com.firstcomecoupon.controller.dto.CreateCouponResponse
-import com.firstcomecoupon.domain.Coupon
-import com.firstcomecoupon.repository.CouponRepository
+import com.firstcomecoupon.coupon.api.dto.CreateCouponRequest
+import com.firstcomecoupon.coupon.api.dto.CreateCouponResponse
+import com.firstcomecoupon.coupon.domain.Coupon
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.data.redis.core.StringRedisTemplate
 
 @Service
-class CouponService(
+class CouponApplicationService(
     private val couponRepository: CouponRepository,
     private val stringRedisTemplate: StringRedisTemplate,
 ) {
@@ -20,7 +20,6 @@ class CouponService(
             Coupon(
                 name = request.name,
                 totalQuantity = request.totalQuantity,
-                issuedQuantity = 0,
                 issueStartAt = request.issueStartAt,
                 issueEndAt = request.issueEndAt,
             ),
@@ -32,7 +31,6 @@ class CouponService(
             id = savedCoupon.id,
             name = savedCoupon.name,
             totalQuantity = savedCoupon.totalQuantity,
-            issuedQuantity = savedCoupon.issuedQuantity,
             issueStartAt = savedCoupon.issueStartAt,
             issueEndAt = savedCoupon.issueEndAt,
             createdAt = savedCoupon.createdAt,

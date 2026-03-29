@@ -1,4 +1,4 @@
-package com.firstcomecoupon.serivce
+package com.firstcomecoupon.coupon.infrastructure.redis
 
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
@@ -52,19 +52,31 @@ class CouponClaimRedisGate(
             // 중복 claim 확인과 재고 차감을 한 번에 처리해야
             // 멀티 서버 환경에서 check-then-act race condition을 피할 수 있다.
             setScriptText("""
+                -- 이미 같은 회원이 claim marker를 가지고 있으면 중복 발급 시도다.
+                -- 이 경우 재고를 건드리지 않고 즉시 ALREADY_CLAIMED(-1)를 반환한다.
                 if redis.call('EXISTS', KEYS[2]) == 1 then
                     return -1
                 end
+
+                -- 재고 키가 없으면 아직 초기화되지 않은 비정상 상태로 본다.
                 local stock = redis.call('GET', KEYS[1])
                 if not stock then
                     return -2
                 end
+
                 stock = tonumber(stock)
+
+                -- 남은 수량이 0 이하이면 SOLD_OUT(0)을 반환한다.
                 if stock <= 0 then
                     return 0
                 end
+
+                -- 여기까지 왔으면 중복도 아니고 재고도 있으므로
+                -- 재고 1 차감과 회원 claim marker 기록을 같은 원자 구간에서 처리한다.
                 redis.call('DECR', KEYS[1])
                 redis.call('SET', KEYS[2], '1')
+
+                -- SQL 최종 저장 단계로 넘어갈 수 있는 상태.
                 return 1
             """.trimIndent())
         }

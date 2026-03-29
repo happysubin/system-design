@@ -1,40 +1,16 @@
-package com.firstcomecoupon.controller
+package com.firstcomecoupon.coupon.api
 
-import com.firstcomecoupon.controller.dto.CreateCouponRequest
-import com.firstcomecoupon.controller.dto.CreateCouponResponse
-import com.firstcomecoupon.controller.dto.IssueCouponRequest
-import com.firstcomecoupon.controller.dto.IssueCouponResponse
-import com.firstcomecoupon.serivce.CouponClaimResult
-import com.firstcomecoupon.serivce.CouponClaimService
-import com.firstcomecoupon.serivce.CouponService
-import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RestController
+import com.firstcomecoupon.coupon.api.dto.IssueCouponResponse
+import com.firstcomecoupon.coupon.domain.CouponClaimResult
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.ResponseStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.stereotype.Component
 
-@RestController
-@RequestMapping("/api/v1/coupons")
-class CouponController(
-    private val couponService: CouponService,
-    private val couponClaimService: CouponClaimService,
-) {
+@Component
+class CouponClaimResponseMapper {
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    fun createCoupon(@RequestBody request: CreateCouponRequest): CreateCouponResponse {
-        return couponService.createCoupon(request)
-    }
-
-    @PostMapping("/{couponId}/claim")
-    fun claimCoupon(
-        @PathVariable couponId: Long,
-        @RequestBody request: IssueCouponRequest,
-    ): ResponseEntity<IssueCouponResponse> {
-        return when (val result = couponClaimService.claimCoupon(couponId, request)) {
+    fun toResponse(couponId: Long, memberId: Long, result: CouponClaimResult): ResponseEntity<IssueCouponResponse> {
+        return when (result) {
             is CouponClaimResult.Issued -> ResponseEntity.status(HttpStatus.CREATED).body(
                 IssueCouponResponse(
                     result = "ISSUED",
@@ -49,7 +25,7 @@ class CouponController(
                 IssueCouponResponse(
                     result = "ALREADY_CLAIMED",
                     couponId = couponId,
-                    memberId = request.memberId,
+                    memberId = memberId,
                     message = "member already claimed this coupon",
                 ),
             )
@@ -58,7 +34,7 @@ class CouponController(
                 IssueCouponResponse(
                     result = "SOLD_OUT",
                     couponId = couponId,
-                    memberId = request.memberId,
+                    memberId = memberId,
                     message = "coupon is sold out",
                 ),
             )
@@ -67,7 +43,7 @@ class CouponController(
                 IssueCouponResponse(
                     result = "COUPON_NOT_FOUND",
                     couponId = couponId,
-                    memberId = request.memberId,
+                    memberId = memberId,
                     message = "coupon not found",
                 ),
             )
@@ -76,7 +52,7 @@ class CouponController(
                 IssueCouponResponse(
                     result = "MEMBER_NOT_FOUND",
                     couponId = couponId,
-                    memberId = request.memberId,
+                    memberId = memberId,
                     message = "member not found",
                 ),
             )
@@ -85,7 +61,7 @@ class CouponController(
                 IssueCouponResponse(
                     result = "NOT_IN_ISSUE_WINDOW",
                     couponId = couponId,
-                    memberId = request.memberId,
+                    memberId = memberId,
                     message = "coupon is not currently claimable",
                 ),
             )
@@ -94,11 +70,10 @@ class CouponController(
                 IssueCouponResponse(
                     result = "INTERNAL_FAILURE",
                     couponId = couponId,
-                    memberId = request.memberId,
+                    memberId = memberId,
                     message = "coupon stock is not initialized",
                 ),
             )
         }
     }
-
 }

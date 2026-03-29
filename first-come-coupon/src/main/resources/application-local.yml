@@ -6,3 +6,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+
+coupon:
+  reconciliation:
+    fixed-delay: 60000

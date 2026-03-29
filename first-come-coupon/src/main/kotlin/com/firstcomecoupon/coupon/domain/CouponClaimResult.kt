@@ -1,4 +1,4 @@
-package com.firstcomecoupon.serivce
+package com.firstcomecoupon.coupon.domain
 
 import java.time.LocalDateTime
 

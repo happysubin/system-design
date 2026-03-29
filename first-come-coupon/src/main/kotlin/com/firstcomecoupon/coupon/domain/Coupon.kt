@@ -1,4 +1,4 @@
-package com.firstcomecoupon.domain
+package com.firstcomecoupon.coupon.domain
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -20,9 +20,6 @@ class Coupon(
 
     @Column(name = "total_quantity", nullable = false)
     var totalQuantity: Int = 0,
-
-    @Column(name = "issued_quantity", nullable = false)
-    var issuedQuantity: Int = 0,
 
     @Column(name = "issue_start_at", nullable = false)
     var issueStartAt: LocalDateTime = LocalDateTime.now(),
