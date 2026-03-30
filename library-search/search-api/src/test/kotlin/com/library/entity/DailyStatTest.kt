@@ -11,9 +11,9 @@ class DailyStatTest : StringSpec({
         val givenQuery = "HTTP"
         val givenLocalDateTime = LocalDateTime.of(2026, 1, 1, 0, 0)
 
-        val result = DailyStat(query = givenQuery, localDateTime = givenLocalDateTime)
+        val result = DailyStat(query = givenQuery, eventDateTime = givenLocalDateTime)
 
         result.query shouldBe givenQuery
-        result.localDateTime shouldBe givenLocalDateTime
+        result.eventDateTime shouldBe givenLocalDateTime
     }
 })

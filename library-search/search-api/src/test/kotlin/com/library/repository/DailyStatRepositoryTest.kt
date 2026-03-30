@@ -17,6 +17,9 @@ import java.time.LocalDateTime
 class DailyStatRepositoryTest: StringSpec() {
 
     @Autowired
+    private lateinit var dailyStatRepository: DailyStatRepository
+
+    @Autowired
     lateinit var repository: DailyStatRepository
 
     @Autowired
@@ -28,7 +31,7 @@ class DailyStatRepositoryTest: StringSpec() {
 
             val givenQuery = "HTTP"
             val givenLocalDateTime = LocalDateTime.of(2026, 1, 1, 0, 0)
-            val saved = repository.save(DailyStat(query = givenQuery, localDateTime = givenLocalDateTime))
+            val saved = repository.save(DailyStat(query = givenQuery, eventDateTime = givenLocalDateTime))
 
             em.clear()
 
@@ -36,7 +39,23 @@ class DailyStatRepositoryTest: StringSpec() {
 
             result.id shouldBe saved.id
             result.query shouldBe givenQuery
-            result.localDateTime shouldBe givenLocalDateTime
+            result.eventDateTime shouldBe givenLocalDateTime
+        }
+
+        "쿼리의 카운트를 조회" {
+            val givenQuery = "HTTP"
+            val now = LocalDateTime.of(2026, 1, 1, 0, 0)
+            val stat1 = DailyStat(query = givenQuery, eventDateTime = now.plusMinutes(10))
+            val stat2 = DailyStat(query = givenQuery, eventDateTime = now.minusMinutes(10))
+            val stat3 = DailyStat(query = givenQuery, eventDateTime = now.plusMinutes(11))
+            val stat4 = DailyStat(query = "JAVA", eventDateTime = now.plusMinutes(10))
+
+            repository.saveAll(listOf(stat1, stat2, stat3, stat4))
+
+            val count = dailyStatRepository.countByQueryAndEventDateTimeBetween(givenQuery, now, now.plusDays(1))
+
+            count shouldBe 2
+
         }
     }
 }

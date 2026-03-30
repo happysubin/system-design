@@ -20,13 +20,13 @@ class DailyStatCommandServiceTest : StringSpec({
     }
 
     "저장시 넘어온 인자가 그대로 호출된다." {
-        val dailyStat = DailyStat(query = "HTTP", localDateTime = LocalDateTime.of(2026, 1, 1, 1, 1),)
+        val dailyStat = DailyStat(query = "HTTP", eventDateTime = LocalDateTime.of(2026, 1, 1, 1, 1),)
 
         every {
             dailyStatRepository.save(any())
         } returns dailyStat
 
-        val result = dailyStatCommandService.save(dailyStat)
+        dailyStatCommandService.save(dailyStat)
 
         verify(exactly = 1) {
             dailyStatRepository.save(dailyStat)

@@ -1,5 +1,6 @@
 package com.library.entity
 
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
@@ -13,12 +14,14 @@ class DailyStat(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
+    @Column(name = "query")
     val query: String,
-    val localDateTime: LocalDateTime
+    @Column(name = "event_date_time")
+    val eventDateTime: LocalDateTime
 ) {
 
 
     override fun toString(): String {
-        return "DailyStat(id=$id, query='$query', localDateTime=$localDateTime)"
+        return "DailyStat(id=$id, query='$query', localDateTime=$eventDateTime)"
     }
 }
