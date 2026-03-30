@@ -5,9 +5,24 @@ tasks.getByName<BootJar>("bootJar") {
     enabled = false
 }
 
+allOpen {
+    // JPA 어노테이션
+    annotation("jakarta.persistence.Embeddable")
+    annotation("jakarta.persistence.Entity")
+    annotation("jakarta.persistence.MappedSuperclass")
+}
+
+
 dependencies {
     implementation(project(":common"))
     implementation(project(":external:naver-client"))
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+
+    testImplementation("org.springframework.boot:spring-boot-data-jpa-test")
+
+    runtimeOnly("com.h2database:h2")
+
+    developmentOnly("org.springframework.boot:spring-boot-h2console")
 }
 

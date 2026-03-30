@@ -1,36 +1,28 @@
 package com.library.controller
 
 import com.library.controller.response.PageResult
-import com.library.controller.response.SearchResponse
-import com.library.service.BookQueryService
-import io.kotest.core.spec.style.FunSpec
+import com.library.service.BookApplicationService
 import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.springframework.http.HttpStatus
-import org.springframework.http.HttpStatusCode
-import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.assertj.MockMvcTester
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-import org.springframework.test.web.servlet.result.MockMvcResultHandlers
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 
 
 class BookSearchControllerTest : StringSpec({
 
-    val bookQueryService = mockk<BookQueryService>()
-    val bookController = BookSearchController(bookQueryService)
+    val bookApplicationService = mockk<BookApplicationService>()
+    val bookController = BookSearchController(bookApplicationService)
     val mockMvc = MockMvcBuilders
         .standaloneSetup(bookController)
         .build()
 
     beforeTest {
-        clearMocks(bookQueryService)
+        clearMocks(bookApplicationService)
     }
 
     "search books"  {
@@ -38,7 +30,7 @@ class BookSearchControllerTest : StringSpec({
         val givenPage = 1
         val givenSize = 10
 
-        every { bookQueryService.search(givenQuery, givenPage, givenSize) } returns PageResult(0 , 0 ,0 , listOf())
+        every { bookApplicationService.search(givenQuery, givenPage, givenSize) } returns PageResult(0 , 0 ,0 , listOf())
 
         val response = mockMvc
             .perform(
@@ -51,7 +43,7 @@ class BookSearchControllerTest : StringSpec({
         response.status shouldBe  HttpStatus.OK.value()
 
         verify(exactly = 1) {
-            bookQueryService.search(givenQuery, givenPage, givenSize)
+            bookApplicationService.search(givenQuery, givenPage, givenSize)
         }
     }
 })
