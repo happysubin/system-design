@@ -16,7 +16,7 @@ data class NaverBookSearchResponse(
         val author: String,
         val discount: Int,
         val publisher: String,
-        @JsonProperty("pubdata")
+        @JsonProperty("pubdate")
         val pubDate: String,
         val isbn: String,
         val description: String

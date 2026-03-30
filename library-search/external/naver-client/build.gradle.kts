@@ -4,5 +4,5 @@ tasks.getByName<Jar>("jar") {
 
 dependencies {
     implementation(project(":common"))
-    implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
+    api("org.springframework.cloud:spring-cloud-starter-openfeign")
 }

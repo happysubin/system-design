@@ -8,5 +8,6 @@ tasks.getByName<BootJar>("bootJar") {
 dependencies {
     implementation(project(":common"))
     implementation(project(":external:naver-client"))
+    implementation("org.springframework.boot:spring-boot-starter-validation")
 }
 
