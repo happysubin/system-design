@@ -6,5 +6,7 @@ tasks.getByName<BootJar>("bootJar") {
 }
 
 dependencies {
+    implementation(project(":common"))
+    implementation(project(":external:naver-client"))
 }
 

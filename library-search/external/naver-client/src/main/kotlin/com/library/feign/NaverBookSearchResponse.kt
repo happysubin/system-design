@@ -10,15 +10,15 @@ data class NaverBookSearchResponse(
     val items: List<Item>
 ) {
     data class Item(
-        val title: String?,
-        val link: String?,
-        val image: String?,
-        val author: String?,
-        val discount: Int?,
-        val publisher: String?,
+        val title: String,
+        val link: String,
+        val image: String,
+        val author: String,
+        val discount: Int,
+        val publisher: String,
         @JsonProperty("pubdata")
-        val pubDate: String?,
-        val isbn: String?,
-        val description: String?
+        val pubDate: String,
+        val isbn: String,
+        val description: String
     )
 }
