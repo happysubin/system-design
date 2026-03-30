@@ -25,4 +25,8 @@ class BookApplicationService(
     fun findQueryCount(query: String, date: LocalDate): StatResponse {
         return dailyStatQueryService.findQueryCount(query, date)
     }
+
+    fun findTop5Query(): List<StatResponse> {
+        return dailyStatQueryService.findTop5Query()
+    }
 }

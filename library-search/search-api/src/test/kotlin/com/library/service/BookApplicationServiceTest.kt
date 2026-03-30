@@ -66,4 +66,17 @@ class BookApplicationServiceTest : StringSpec({
         }
     }
 
+    "findTop5Query 메서드 호출 시 dailyStatQuerySevice의 findTop5Query 메서드가 호출된다." {
+
+        every {
+            dailyStatQueryService.findTop5Query()
+        } returns listOf()
+
+        bookApplicationService.findTop5Query()
+
+        verify(exactly = 1) {
+            dailyStatQueryService.findTop5Query()
+        }
+    }
+
 })

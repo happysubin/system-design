@@ -6,9 +6,13 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -18,8 +22,7 @@ class GlobalExceptionHandler {
     fun handleValidation(e: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {
         log.error("MethodArgumentNotValidException occurred. message = {}, className = {}", e.message, e.javaClass.name)
         val errorMessage = e.bindingResult.fieldErrors
-            .mapNotNull { fieldError -> fieldError.defaultMessage }
-            .joinToString(", ")
+            .joinToString(", ") { it.toMessage() }
 
         return ResponseEntity
             .badRequest()
@@ -29,6 +32,42 @@ class GlobalExceptionHandler {
                     errorType = ErrorType.INVALID_PARAMETER
                 )
             )
+    }
+
+    private fun FieldError.toMessage(): String {
+        return when {
+            isLocalDateTypeMismatch() -> "$field must be in yyyyMMdd format"
+            defaultMessage != null -> "$defaultMessage"
+            else -> "$field: invalid input"
+        }
+    }
+
+    private fun FieldError.isLocalDateTypeMismatch(): Boolean {
+        return codes?.contains("typeMismatch.java.time.LocalDate") == true
+    }
+
+    @ExceptionHandler(NoResourceFoundException::class)
+    fun handleNoResourceFound(e: NoResourceFoundException): ResponseEntity<ErrorResponse> {
+        log.error("NoResourceFoundException occurred. message = {}, className = {}", e.message, e.javaClass.name)
+        return ResponseEntity
+            .badRequest()
+            .body(ErrorResponse(errorMessage = ErrorType.NO_RESOURCE.description, errorType = ErrorType.NO_RESOURCE))
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException::class)
+    fun handleMissingServletRequestParameterException(e: MissingServletRequestParameterException): ResponseEntity<ErrorResponse> {
+        log.error("MissingServletRequestParameterException occurred. parameterName = {}, message = {}", e.parameterName, e.message)
+        return ResponseEntity
+            .badRequest()
+            .body(ErrorResponse(errorMessage = ErrorType.INVALID_PARAMETER.description, errorType = ErrorType.INVALID_PARAMETER))
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleMethodArgumentTypeMismatchException(e: MethodArgumentTypeMismatchException): ResponseEntity<ErrorResponse> {
+        log.error("MethodArgumentTypeMismatchException occurred. message = {}", e.message)
+        return ResponseEntity
+            .badRequest()
+            .body(ErrorResponse(errorMessage = ErrorType.INVALID_PARAMETER.description, errorType = ErrorType.INVALID_PARAMETER))
     }
 
     @ExceptionHandler(ApplicationException::class)

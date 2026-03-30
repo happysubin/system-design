@@ -35,4 +35,10 @@ class BookSearchController(
         log.info("[BookSearchController] find stats query={}, data={}", request.query, request.date)
         return bookApplicationService.findQueryCount(requireNotNull(request.query), requireNotNull(request.date))
     }
+
+    @GetMapping("/stats/ranking")
+    fun findTop5Query(): List<StatResponse> {
+        log.info("[BookSearchController] find top 5 query")
+        return bookApplicationService.findTop5Query()
+    }
 }

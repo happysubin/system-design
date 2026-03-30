@@ -71,4 +71,20 @@ class BookSearchControllerTest : StringSpec({
             bookApplicationService.findQueryCount(givenQuery, givenDate)
         }
     }
+
+    "findTop5Query"  {
+
+        every {
+            bookApplicationService.findTop5Query()
+        } returns listOf()
+
+        val response = mockMvc
+            .perform(
+                MockMvcRequestBuilders.get("/api/v1/books/stats/ranking")
+            )
+            .andReturn()
+            .response
+
+        response.status shouldBe  HttpStatus.OK.value()
+    }
 })

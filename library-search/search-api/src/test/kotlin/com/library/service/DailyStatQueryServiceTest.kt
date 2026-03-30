@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.springframework.data.domain.PageRequest
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -31,4 +32,15 @@ class DailyStatQueryServiceTest : StringSpec({
         }
     }
 
+    "findTop5Query 조회 시 상위 5개 반환 요청이 들어간다." {
+
+        every {
+            dailyStatRepository.findTopQuery(any())
+        } returns listOf()
+
+        dailyStatQueryService.findTop5Query()
+
+        verify { dailyStatRepository.findTopQuery(pageable = PageRequest.of(0, 5)) }
+
+    }
 })
