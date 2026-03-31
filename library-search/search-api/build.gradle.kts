@@ -18,6 +18,8 @@ dependencies {
     implementation(project(":external:naver-client"))
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.2")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
 
     testImplementation("org.springframework.boot:spring-boot-data-jpa-test")
 

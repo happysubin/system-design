@@ -2,6 +2,7 @@ package com.library.config
 
 import com.library.ApplicationException
 import com.library.ErrorType
+import io.swagger.v3.oas.annotations.media.Schema
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -86,8 +87,11 @@ class GlobalExceptionHandler {
             .body(ErrorResponse(errorMessage = ErrorType.UNKNOWN.description, errorType = ErrorType.UNKNOWN))
     }
 
-    class ErrorResponse(
+    @Schema(description = "에러응답")
+    data class ErrorResponse(
+        @field:Schema(description = "에러 메시지", example = "잘못된 요청값입니다.")
         val errorMessage: String,
+        @field:Schema(description = "에러 타입", example = "INVALID_PARAMETER")
         val errorType: ErrorType,
     )
 }
