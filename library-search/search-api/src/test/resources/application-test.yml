@@ -1,0 +1,22 @@
+spring:
+  external:
+    naver:
+      url: https://openapi.naver.com
+      headers:
+        client-id: ${NAVER_API_CLIENT_ID}
+        client-secret: ${NAVER_API_CLIENT_SECRET}
+    kakao:
+      url: https://dapi.kakao.com
+      headers:
+        rest-api-key: ${KAKAO_REST_API_KEY}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 100
+        minimum-number-of-calls: 10
+        wait-duration-in-open-state:
+          seconds: 20
+        failure-rate-threshold: 50
+        permitted-number-of-calls-in-half-open-state: 10

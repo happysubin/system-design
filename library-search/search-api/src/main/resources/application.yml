@@ -1,0 +1,30 @@
+spring:
+  profiles:
+    active: local
+  config:
+    import:
+      - application-naver-client.yml
+      - application-kakao-client.yml
+  h2:
+    console:
+      enabled: true
+  datasource:
+    url: jdbc:h2:mem:lsdb
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        format_sql: true
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 100 # 최근 100개의 호출 결과를 기준으로 실패율을 계산
+        minimum-number-of-calls: 10 # 최소 10번 이상 호출되기 전에는 실패율을 계산해서 OPEN으로 바꾸지 않겠다는 뜻
+        wait-duration-in-open-state: # OPEN 상태가 되면 20초 동안 요청을 차단
+          seconds: 20
+        failure-rate-threshold: 50 # 실패율이 50% 이상이면 circuit을 OPEN
+        permitted-number-of-calls-in-half-open-state: 10 # OPEN 상태에서 20초가 지나 HALF_OPEN이 되면, 아무 요청이나 무한정 다시 보내는 게 아니라 10개만 시험 통과
