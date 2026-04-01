@@ -5,6 +5,11 @@ spring:
       headers:
         client-id: ${NAVER_API_CLIENT_ID}
         client-secret: ${NAVER_API_CLIENT_SECRET}
+    kakao:
+      url: https://dapi.kakao.com
+      headers:
+        rest-api-key: ${KAKAO_REST_API_KEY}
+
 resilience4j:
   circuitbreaker:
     configs:

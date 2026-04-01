@@ -9,7 +9,7 @@ import tools.jackson.databind.json.JsonMapper
 class NaverFeignClientConfiguration {
 
     @Bean
-    fun requestInterceptor(
+    fun naverRequestInterceptor(
         naverProperties: NaverProperties
     ): RequestInterceptor {
         return RequestInterceptor {

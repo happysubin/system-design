@@ -1,4 +1,4 @@
-package com.library.feign
+package com.library
 
 import com.fasterxml.jackson.annotation.JsonProperty
 

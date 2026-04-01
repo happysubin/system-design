@@ -2,7 +2,7 @@ package com.library.repository
 
 import com.library.controller.response.PageResult
 import com.library.controller.response.SearchResponse
-import com.library.feign.NaverBookSearchResponse
+import com.library.NaverBookSearchResponse
 import com.library.feign.NaverFeignClient
 import com.library.toLocalDate
 import org.springframework.stereotype.Repository

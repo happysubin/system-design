@@ -8,7 +8,7 @@ import org.assertj.core.api.Assertions
 
 class NaverFeignClientConfigurationTest: StringSpec({
 
-    "requestInterceptor의 header에 key값들이 적용된다." {
+    "naverRequestInterceptor의 header에 key값들이 적용된다." {
 
         // given
         val requestTemplate = RequestTemplate()
@@ -22,7 +22,7 @@ class NaverFeignClientConfigurationTest: StringSpec({
         )
 
         //when
-        val interceptor = client.requestInterceptor(
+        val interceptor = client.naverRequestInterceptor(
             properties
         )
 

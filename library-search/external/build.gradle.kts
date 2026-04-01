@@ -3,5 +3,10 @@ tasks.getByName<Jar>("jar") {
     enabled = true
 }
 
-dependencies {
+subprojects {
+    dependencies {
+        implementation(project(":common"))
+        api("org.springframework.cloud:spring-cloud-starter-openfeign")
+    }
 }
+

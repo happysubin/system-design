@@ -1,6 +1,6 @@
 package com.library.repository
 
-import com.library.feign.NaverBookSearchResponse
+import com.library.NaverBookSearchResponse
 import com.library.feign.NaverFeignClient
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -12,7 +12,7 @@ import java.time.LocalDate
 class NaverBookRepositoryTest : StringSpec({
 
     val naverFeignClient = mockk<NaverFeignClient>()
-    val bookRepository: BookRepository = NaverBookRepository(naverFeignClient)
+    val naverBookRepository: BookRepository = NaverBookRepository(naverFeignClient)
 
     afterTest {
         clearMocks(naverFeignClient)
@@ -62,7 +62,7 @@ class NaverBookRepositoryTest : StringSpec({
 
 
         // when
-        val result = bookRepository.search(givenQuery, givenPage, givenSize)
+        val result = naverBookRepository.search(givenQuery, givenPage, givenSize)
 
 
         result.page shouldBe givenPage
