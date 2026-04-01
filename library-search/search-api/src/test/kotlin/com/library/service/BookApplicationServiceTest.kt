@@ -1,8 +1,11 @@
 package com.library.service
 
 import com.library.controller.response.PageResult
+import com.library.controller.response.SearchResponse
 import com.library.controller.response.StatResponse
 import com.library.entity.DailyStat
+import com.library.event.SearchEvent
+import com.library.toLocalDate
 import io.kotest.core.spec.style.StringSpec
 import io.mockk.Runs
 import io.mockk.clearAllMocks
@@ -10,15 +13,16 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
+import org.springframework.context.ApplicationEventPublisher
 import java.time.LocalDate
 import java.time.LocalDateTime
 
 class BookApplicationServiceTest : StringSpec({
 
     val bookQueryService = mockk<BookQueryService>()
-    val dailyStatCommandService = mockk<DailyStatCommandService>()
     val dailyStatQueryService = mockk<DailyStatQueryService>()
-    val bookApplicationService = BookApplicationService(dailyStatCommandService, dailyStatQueryService, bookQueryService)
+    val eventPublisher = mockk<ApplicationEventPublisher>()
+    val bookApplicationService = BookApplicationService(dailyStatQueryService, bookQueryService, eventPublisher)
 
     afterTest {
         clearAllMocks()
@@ -28,14 +32,21 @@ class BookApplicationServiceTest : StringSpec({
         val givenQuery = "HTTP"
         val page = 1
         val size = 1
-        val dailyStat = DailyStat(query = givenQuery, eventDateTime = LocalDateTime.now())
 
         every {
-            bookQueryService.search(givenQuery, page, size)
-        } returns PageResult(1, 1, 1, listOf())
+            bookQueryService.search(any(), any(), any())
+        } returns PageResult(1, 1, 1, listOf(
+            SearchResponse(
+                title = "title",
+                author = "author",
+                publisher = "publisher",
+                pubDate = LocalDate.parse("2020-01-01"),
+                isbn = "isbn",
+            )
+        ))
 
         every {
-            dailyStatCommandService.save(any())
+            eventPublisher.publishEvent(any<Any>())
         } just Runs
 
         bookApplicationService.search(givenQuery, page, size)
@@ -44,10 +55,10 @@ class BookApplicationServiceTest : StringSpec({
             bookQueryService.search(givenQuery, page, size)
         }
         verify(exactly = 1) {
-            dailyStatCommandService.save(match {
-                it.query == dailyStat.query
-            })
-        }
+        eventPublisher.publishEvent(match<Any> {
+            it is SearchEvent && it.query == givenQuery
+        })
+    }
     }
 
     "findQueryCount 메서드 호출 시 인자를 그대로 넘긴다." {
