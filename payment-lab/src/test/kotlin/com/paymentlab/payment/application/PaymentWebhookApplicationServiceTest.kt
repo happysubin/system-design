@@ -1,0 +1,74 @@
+package com.paymentlab.payment.application
+
+import com.paymentlab.payment.api.dto.PaymentWebhookRequest
+import com.paymentlab.payment.domain.Order
+import com.paymentlab.payment.domain.PaymentAttempt
+import com.paymentlab.payment.domain.PaymentStatus
+import com.paymentlab.payment.infrastructure.persistence.PaymentAttemptRepository
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.BDDMockito.given
+import org.mockito.Mock
+import org.mockito.Mockito.verify
+import org.mockito.junit.jupiter.MockitoExtension
+import kotlin.test.assertEquals
+
+@ExtendWith(MockitoExtension::class)
+class PaymentWebhookApplicationServiceTest {
+
+    @Mock
+    lateinit var paymentAttemptRepository: PaymentAttemptRepository
+
+    @Test
+    fun `성공 웹훅이 오면 pending 결제 시도를 done으로 확정한다`() {
+        val paymentAttempt = PaymentAttempt(
+            id = 10,
+            order = Order(id = 1, merchantOrderId = "order-1", amount = 15000),
+            idempotencyKey = "idem-1",
+            pgTransactionId = "pg-tx-1",
+            amount = 15000,
+            status = PaymentStatus.PENDING,
+        )
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+
+        given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
+
+        val result = service.handleWebhook(
+            PaymentWebhookRequest(
+                pgTransactionId = "pg-tx-1",
+                result = "SUCCESS",
+            ),
+        )
+
+        assertEquals(10, result.paymentAttemptId)
+        assertEquals(PaymentStatus.DONE, result.status)
+        assertEquals(PaymentStatus.DONE, paymentAttempt.status)
+        verify(paymentAttemptRepository).save(paymentAttempt)
+    }
+
+    @Test
+    fun `실패 웹훅이 오면 pending 결제 시도를 failed로 확정한다`() {
+        val paymentAttempt = PaymentAttempt(
+            id = 10,
+            order = Order(id = 1, merchantOrderId = "order-1", amount = 15000),
+            idempotencyKey = "idem-1",
+            pgTransactionId = "pg-tx-1",
+            amount = 15000,
+            status = PaymentStatus.PENDING,
+        )
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+
+        given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
+
+        val result = service.handleWebhook(
+            PaymentWebhookRequest(
+                pgTransactionId = "pg-tx-1",
+                result = "FAIL",
+            ),
+        )
+
+        assertEquals(PaymentStatus.FAILED, result.status)
+        assertEquals(PaymentStatus.FAILED, paymentAttempt.status)
+        verify(paymentAttemptRepository).save(paymentAttempt)
+    }
+}
