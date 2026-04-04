@@ -113,6 +113,13 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 - `422 UNPROCESSABLE_ENTITY`: `NOT_IN_ISSUE_WINDOW`
 - `500 INTERNAL_SERVER_ERROR`: `INTERNAL_FAILURE` (예: Redis stock 미초기화, 예기치 못한 런타임 오류)
 
+### 실패 처리 동작
+
+- Redis gate를 통과했더라도 SQL 최종 저장 단계에서 실패할 수 있다.
+- 이 경우 Redis는 claim marker 삭제와 재고 복구를 Lua 스크립트 1회로 원자적으로 rollback한다.
+- SQL에서 품절이 판정되거나 예기치 못한 오류가 발생하면 해당 coupon의 Redis stock을 SQL truth 기준으로 다시 reconciliation한다.
+- 같은 회원의 중복 발급은 Redis claim marker와 SQL unique 제약조건으로 함께 방어하며, 최종적으로는 `ALREADY_CLAIMED`로 수렴한다.
+
 ## 설계 원칙
 
 - Redis는 빠른 admission gate로 사용하고, 최종 정합성은 SQL에서 보장한다.
