@@ -38,8 +38,10 @@ class CouponClaimRedisGate(
     }
 
     fun rollback(couponId: Long, memberId: Long) {
-        stringRedisTemplate.opsForValue().increment(stockKey(couponId))
-        stringRedisTemplate.delete(claimKey(couponId, memberId))
+        stringRedisTemplate.execute(
+            ROLLBACK_SCRIPT,
+            listOf(stockKey(couponId), claimKey(couponId, memberId)),
+        )
     }
 
     private fun stockKey(couponId: Long): String = "coupon:stock:$couponId"
@@ -79,6 +81,24 @@ class CouponClaimRedisGate(
                 -- SQL 최종 저장 단계로 넘어갈 수 있는 상태.
                 return 1
             """.trimIndent())
+        }
+
+        private val ROLLBACK_SCRIPT = DefaultRedisScript<Long>().apply {
+            setResultType(Long::class.java)
+            setScriptText(
+                """
+                if redis.call('EXISTS', KEYS[2]) == 0 then
+                    return 0
+                end
+
+                if redis.call('EXISTS', KEYS[1]) == 1 then
+                    redis.call('INCR', KEYS[1])
+                end
+
+                redis.call('DEL', KEYS[2])
+                return 1
+                """.trimIndent(),
+            )
         }
     }
 }

@@ -22,11 +22,15 @@ class CouponClaimApplicationService(
 
         val eligible = eligibility as CouponClaimEligibilityResult.Eligible
 
-        return when (couponClaimRedisGate.tryClaim(couponId, eligible.member.id)) {
-            CouponClaimGateResult.ALREADY_CLAIMED -> CouponClaimResult.AlreadyClaimed
-            CouponClaimGateResult.SOLD_OUT -> CouponClaimResult.SoldOut
-            CouponClaimGateResult.NOT_INITIALIZED -> CouponClaimResult.InternalFailure
-            CouponClaimGateResult.PASSED -> couponClaimCompensationHandler.finalizeClaim(couponId, eligible.member.id)
+        return try {
+            when (couponClaimRedisGate.tryClaim(couponId, eligible.member.id)) {
+                CouponClaimGateResult.ALREADY_CLAIMED -> CouponClaimResult.AlreadyClaimed
+                CouponClaimGateResult.SOLD_OUT -> CouponClaimResult.SoldOut
+                CouponClaimGateResult.NOT_INITIALIZED -> CouponClaimResult.InternalFailure("coupon stock is not initialized")
+                CouponClaimGateResult.PASSED -> couponClaimCompensationHandler.finalizeClaim(couponId, eligible.member.id)
+            }
+        } catch (_: RuntimeException) {
+            CouponClaimResult.InternalFailure("unexpected coupon claim failure")
         }
     }
 }

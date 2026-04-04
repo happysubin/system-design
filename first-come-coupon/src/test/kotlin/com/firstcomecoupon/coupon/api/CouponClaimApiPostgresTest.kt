@@ -96,7 +96,7 @@ class CouponClaimApiPostgresTest : AbstractPostgresApiTest() {
     }
 
     @Test
-    fun `Redis 통과 후에도 SQL capacity guard에서 수량이 초과되면 품절로 처리되고 Redis가 복구된다`() {
+    fun `Redis 통과 후에도 SQL capacity guard에서 수량이 초과되면 품절로 처리되고 Redis 재고가 SQL truth로 재정렬된다`() {
         val coupon = couponRepository.save(
             Coupon(
                 name = "선착순 쿠폰",
@@ -120,7 +120,7 @@ class CouponClaimApiPostgresTest : AbstractPostgresApiTest() {
             .andExpect(jsonPath("$.result").value("SOLD_OUT"))
 
         assertEquals(1, couponIssueRepository.count())
-        assertEquals("1", stringRedisTemplate.opsForValue().get("coupon:stock:${coupon.id}"))
+        assertEquals("0", stringRedisTemplate.opsForValue().get("coupon:stock:${coupon.id}"))
         assertNull(stringRedisTemplate.opsForValue().get("coupon:claim:${coupon.id}:${member2.id}"))
     }
 

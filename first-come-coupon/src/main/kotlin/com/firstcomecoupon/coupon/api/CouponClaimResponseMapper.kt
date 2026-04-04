@@ -66,12 +66,12 @@ class CouponClaimResponseMapper {
                 ),
             )
 
-            CouponClaimResult.InternalFailure -> ResponseEntity.internalServerError().body(
+            is CouponClaimResult.InternalFailure -> ResponseEntity.internalServerError().body(
                 IssueCouponResponse(
                     result = "INTERNAL_FAILURE",
                     couponId = couponId,
                     memberId = memberId,
-                    message = "coupon stock is not initialized",
+                    message = result.message,
                 ),
             )
         }

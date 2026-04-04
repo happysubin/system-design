@@ -34,7 +34,12 @@ class CouponController(
         @PathVariable couponId: Long,
         @RequestBody request: IssueCouponRequest,
     ): ResponseEntity<IssueCouponResponse> {
-        val result = couponClaimApplicationService.claimCoupon(couponId, request)
+        val result = try {
+            couponClaimApplicationService.claimCoupon(couponId, request)
+        } catch (_: RuntimeException) {
+            com.firstcomecoupon.coupon.domain.CouponClaimResult.InternalFailure("unexpected coupon claim failure")
+        }
+
         return couponClaimResponseMapper.toResponse(couponId, request.memberId, result)
     }
 

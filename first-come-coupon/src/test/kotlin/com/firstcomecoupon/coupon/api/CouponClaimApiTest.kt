@@ -8,6 +8,7 @@ import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
 import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimGateResult
 import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimRedisGate
+import com.firstcomecoupon.coupon.infrastructure.reconciliation.CouponStockReconciliationService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -45,6 +46,9 @@ class CouponClaimApiTest {
 
     @MockitoBean
     lateinit var couponClaimRedisGate: CouponClaimRedisGate
+
+    @MockitoBean
+    lateinit var couponStockReconciliationService: CouponStockReconciliationService
 
     @BeforeEach
     fun setUp() {

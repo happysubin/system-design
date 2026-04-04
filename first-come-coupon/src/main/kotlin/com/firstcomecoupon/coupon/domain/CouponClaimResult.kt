@@ -15,5 +15,7 @@ sealed interface CouponClaimResult {
     data object CouponNotFound : CouponClaimResult
     data object MemberNotFound : CouponClaimResult
     data object NotInIssueWindow : CouponClaimResult
-    data object InternalFailure : CouponClaimResult
+    data class InternalFailure(
+        val message: String,
+    ) : CouponClaimResult
 }
