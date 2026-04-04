@@ -10,7 +10,9 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.BDDMockito.given
 import org.mockito.Mock
+import org.junit.jupiter.api.assertThrows
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.never
 import org.mockito.junit.jupiter.MockitoExtension
 import java.util.Optional
 import kotlin.test.assertEquals
@@ -54,5 +56,30 @@ class PaymentApprovalApplicationServiceTest {
         assertEquals(PaymentStatus.PENDING, paymentAttempt.status)
         assertEquals("pg-tx-1", paymentAttempt.pgTransactionId)
         verify(pgClient).approve(paymentAttempt.id, order.merchantOrderId, paymentAttempt.amount)
+    }
+
+    @Test
+    fun `ready가 아닌 결제 시도는 승인 요청할 수 없다`() {
+        val order = Order(
+            id = 1,
+            merchantOrderId = "order-1",
+            amount = 15000,
+        )
+        val paymentAttempt = PaymentAttempt(
+            id = 10,
+            order = order,
+            idempotencyKey = "idem-1",
+            amount = order.amount,
+            status = PaymentStatus.PENDING,
+        )
+        val service = PaymentApplicationService(orderRepository, paymentAttemptRepository, pgClient)
+
+        given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
+
+        assertThrows<IllegalStateException> {
+            service.approvePaymentAttempt(paymentAttempt.id)
+        }
+
+        verify(pgClient, never()).approve(paymentAttempt.id, order.merchantOrderId, paymentAttempt.amount)
     }
 }

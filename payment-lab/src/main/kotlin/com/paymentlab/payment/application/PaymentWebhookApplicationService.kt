@@ -17,6 +17,17 @@ class PaymentWebhookApplicationService(
         val paymentAttempt = paymentAttemptRepository.findByPgTransactionId(request.pgTransactionId)
             ?: throw IllegalArgumentException("payment attempt not found for pgTransactionId: ${request.pgTransactionId}")
 
+        if (paymentAttempt.status == PaymentStatus.DONE || paymentAttempt.status == PaymentStatus.FAILED || paymentAttempt.status == PaymentStatus.CANCELLED) {
+            return PaymentWebhookResponse(
+                paymentAttemptId = paymentAttempt.id,
+                status = paymentAttempt.status,
+            )
+        }
+
+        if (paymentAttempt.status != PaymentStatus.PENDING) {
+            throw IllegalStateException("payment attempt is not pending: ${paymentAttempt.status}")
+        }
+
         paymentAttempt.status = if (request.result == "SUCCESS") {
             PaymentStatus.DONE
         } else {
