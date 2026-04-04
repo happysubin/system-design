@@ -9,6 +9,8 @@ interface CouponIssueRepository : JpaRepository<CouponIssue, Long> {
 
     fun countByCouponId(couponId: Long): Long
 
+    fun existsByCouponIdAndMemberId(couponId: Long, memberId: Long): Boolean
+
     @Query(
         """
         select ci.coupon.id as couponId, count(ci) as issuedCount

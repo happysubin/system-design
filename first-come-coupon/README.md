@@ -115,10 +115,22 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 
 ### 실패 처리 동작
 
-- Redis gate를 통과했더라도 SQL 최종 저장 단계에서 실패할 수 있다.
-- 이 경우 Redis는 claim marker 삭제와 재고 복구를 Lua 스크립트 1회로 원자적으로 rollback한다.
-- SQL에서 품절이 판정되거나 예기치 못한 오류가 발생하면 해당 coupon의 Redis stock을 SQL truth 기준으로 다시 reconciliation한다.
-- 같은 회원의 중복 발급은 Redis claim marker와 SQL unique 제약조건으로 함께 방어하며, 최종적으로는 `ALREADY_CLAIMED`로 수렴한다.
+- 쿠폰 발급 요청은 크게 **eligibility 확인 → Redis gate → SQL 최종 저장** 순서로 진행된다.
+- **Redis gate 단계에서 실패하는 경우**
+  - 이미 같은 회원의 claim marker가 있으면 `ALREADY_CLAIMED`로 종료된다.
+  - Redis stock이 0 이하이면 `SOLD_OUT`으로 종료된다.
+  - Redis stock key가 초기화되지 않았거나 유실된 경우 `INTERNAL_FAILURE`로 종료된다.
+- **Redis gate는 통과했지만 SQL 최종 저장 단계에서 실패하는 경우**
+  - DB row lock 이후 발급 건수를 다시 확인했을 때 수량이 이미 다 찼으면 SQL에서 `SoldOut`으로 판정된다.
+  - 같은 회원에 대한 중복 저장이 발생하면 SQL unique 제약조건으로 최종 방어된다.
+  - 그 외에도 비중복 무결성 오류나 예기치 못한 런타임 오류가 발생할 수 있다.
+- **복원 로직**
+  - Redis gate를 통과한 뒤 SQL 단계에서 실패하면 1차로 Redis rollback을 수행한다.
+  - rollback은 claim marker 삭제와 재고 복구를 Lua 스크립트 1회로 같은 원자 구간에서 처리한다.
+  - SQL에서 품절 판정, 비중복 무결성 오류, 예기치 못한 런타임 오류가 발생한 경우에는 rollback 이후 해당 coupon의 Redis stock을 SQL truth 기준으로 다시 reconciliation한다.
+  - reconciliation은 Redis stock뿐 아니라 SQL 발급 이력이 없는 orphan claim marker도 함께 정리한다.
+  - 같은 회원의 중복 발급은 Redis claim marker와 SQL unique 제약조건으로 함께 방어하며, 최종적으로는 `ALREADY_CLAIMED`로 수렴한다.
+- 즉, 이 시스템의 복원 로직은 **Redis 즉시 복원(rollback)** 과 **SQL truth 기준 재정렬(reconciliation)** 의 두 단계로 구성된다.
 
 ## 설계 원칙
 
@@ -135,7 +147,8 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 
 현재 구현은 정합성과 기본적인 실패 복구를 우선한 구조다. 다만 실서비스 수준으로 고도화하려면 아래 항목이 추가로 필요하다.
 
-- 고경합 상황에서의 성능 검증을 위한 멀티스레드/부하 테스트 추가
-- stale claim marker 정리까지 포함하는 reconciliation 확장
-- Redis rollback 또는 reconciliation 실패 시 운영자가 즉시 감지할 수 있는 로그/메트릭/알람 추가
+- 현재 동시성 정합성 테스트를 넘어, 고경합 상황에서의 성능 측정과 부하 검증 시나리오 확장
+- Redis rollback 또는 reconciliation 자체가 실패했을 때 후속 복구가 가능하도록 재시도/로그/메트릭/알람 추가
+- 발급 가능 시간 경계에 걸친 요청도 일관되게 처리할 수 있도록 SQL 최종 저장 시점의 issue window 재검증 검토
+- claim marker 정리 과정에서 Redis key 조회 비용을 줄이기 위한 scan/구조 개선 검토
 - `countByCouponId` 기반 최종 검증 비용을 줄이기 위한 카운터 전략 또는 비동기 확정 구조 검토
