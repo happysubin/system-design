@@ -1,9 +1,11 @@
 package com.firstcomecoupon.coupon.api
 
 import com.firstcomecoupon.coupon.domain.Coupon
+import com.firstcomecoupon.coupon.domain.CouponStock
 import com.firstcomecoupon.coupon.domain.Member
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponIssueRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponStockRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
 import com.firstcomecoupon.support.AbstractPostgresApiTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -43,9 +45,13 @@ class CouponClaimConcurrencyTest : AbstractPostgresApiTest() {
 
     @Autowired
     lateinit var stringRedisTemplate: StringRedisTemplate
+
+    @Autowired
+    lateinit var couponStockRepository: CouponStockRepository
     @BeforeEach
     fun setUp() {
         couponIssueRepository.deleteAll()
+        couponStockRepository.deleteAll()
         couponRepository.deleteAll()
         memberRepository.deleteAll()
         stringRedisTemplate.connectionFactory?.connection?.serverCommands()?.flushAll()
@@ -54,6 +60,7 @@ class CouponClaimConcurrencyTest : AbstractPostgresApiTest() {
     @Test
     fun `고경합 환경에서도 발급 수는 총 수량을 초과하지 않는다`() {
         val coupon = couponRepository.save(activeCoupon(totalQuantity = 50))
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = 50))
         val members = (1..100).map { index ->
             memberRepository.save(Member(email = "load-$index@test.com", name = "member-$index"))
         }
@@ -74,6 +81,7 @@ class CouponClaimConcurrencyTest : AbstractPostgresApiTest() {
     @Test
     fun `같은 회원의 동시 발급 요청은 하나만 성공한다`() {
         val coupon = couponRepository.save(activeCoupon(totalQuantity = 100))
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = 100))
         val member = memberRepository.save(Member(email = "duplicate-load@test.com", name = "duplicate-load"))
         stringRedisTemplate.opsForValue().set("coupon:stock:${coupon.id}", coupon.totalQuantity.toString())
 

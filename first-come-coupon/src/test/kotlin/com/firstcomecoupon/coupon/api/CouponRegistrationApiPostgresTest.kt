@@ -2,6 +2,7 @@ package com.firstcomecoupon.coupon.api
 
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponIssueRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponStockRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
 import com.firstcomecoupon.support.AbstractPostgresApiTest
 import org.junit.jupiter.api.BeforeEach
@@ -38,6 +39,9 @@ class CouponRegistrationApiPostgresTest : AbstractPostgresApiTest() {
     @Autowired
     lateinit var stringRedisTemplate: StringRedisTemplate
 
+    @Autowired
+    lateinit var couponStockRepository: CouponStockRepository
+
     @BeforeEach
     fun setUp() {
         couponIssueRepository.deleteAll()
@@ -69,5 +73,6 @@ class CouponRegistrationApiPostgresTest : AbstractPostgresApiTest() {
 
         val savedCoupon = couponRepository.findAll().single()
         assertEquals("30", stringRedisTemplate.opsForValue().get("coupon:stock:${savedCoupon.id}"))
+        assertEquals(30, couponStockRepository.findByCouponId(savedCoupon.id)?.remainingQuantity)
     }
 }

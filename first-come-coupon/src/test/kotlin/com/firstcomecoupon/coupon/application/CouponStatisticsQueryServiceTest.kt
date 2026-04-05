@@ -3,9 +3,11 @@ package com.firstcomecoupon.coupon.application
 import com.firstcomecoupon.coupon.application.CouponStatisticsQueryService
 import com.firstcomecoupon.coupon.domain.Coupon
 import com.firstcomecoupon.coupon.domain.CouponIssue
+import com.firstcomecoupon.coupon.domain.CouponStock
 import com.firstcomecoupon.coupon.domain.Member
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponIssueRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponStockRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -31,9 +33,13 @@ class CouponStatisticsQueryServiceTest {
     @Autowired
     lateinit var memberRepository: MemberRepository
 
+    @Autowired
+    lateinit var couponStockRepository: CouponStockRepository
+
     @BeforeEach
     fun setUp() {
         couponIssueRepository.deleteAll()
+        couponStockRepository.deleteAll()
         couponRepository.deleteAll()
         memberRepository.deleteAll()
     }
@@ -50,6 +56,7 @@ class CouponStatisticsQueryServiceTest {
         )
         val member1 = memberRepository.save(Member(email = "one@test.com", name = "one"))
         val member2 = memberRepository.save(Member(email = "two@test.com", name = "two"))
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = 3))
 
         couponIssueRepository.saveAndFlush(CouponIssue(coupon = coupon, member = member1))
         couponIssueRepository.saveAndFlush(CouponIssue(coupon = coupon, member = member2))

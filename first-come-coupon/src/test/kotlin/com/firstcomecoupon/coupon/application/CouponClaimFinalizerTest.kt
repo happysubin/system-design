@@ -7,6 +7,7 @@ import com.firstcomecoupon.coupon.domain.CouponSoldOutException
 import com.firstcomecoupon.coupon.domain.Member
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponIssueRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponStockRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -33,8 +34,11 @@ class CouponClaimFinalizerTest {
     @Mock
     lateinit var memberRepository: MemberRepository
 
+    @Mock
+    lateinit var couponStockRepository: CouponStockRepository
+
     @Test
-    fun `finalizeClaim persists coupon issue without incrementing coupon counter`() {
+    fun `finalizeClaim decrements coupon stock and persists coupon issue`() {
         val coupon = Coupon(
             id = 1,
             name = "선착순 쿠폰",
@@ -52,24 +56,23 @@ class CouponClaimFinalizerTest {
             coupon = coupon,
             member = member,
         )
-        val finalizer = CouponClaimFinalizer(couponIssueRepository, couponRepository, memberRepository)
+        val finalizer = CouponClaimFinalizer(couponIssueRepository, couponRepository, memberRepository, couponStockRepository)
 
-        given(couponRepository.findByIdForUpdate(coupon.id)).willReturn(coupon)
-        given(couponIssueRepository.countByCouponId(coupon.id)).willReturn(0L)
+        given(couponStockRepository.decrementIfAvailable(coupon.id)).willReturn(1)
+        given(couponRepository.findById(coupon.id)).willReturn(java.util.Optional.of(coupon))
         given(memberRepository.getReferenceById(member.id)).willReturn(member)
         given(couponIssueRepository.saveAndFlush(any(CouponIssue::class.java))).willReturn(savedIssue)
 
         val result = finalizer.finalizeClaim(coupon.id, member.id)
 
         assertEquals(savedIssue.id, result.id)
-        verify(couponRepository).findByIdForUpdate(coupon.id)
-        verify(couponIssueRepository).countByCouponId(coupon.id)
+        verify(couponStockRepository).decrementIfAvailable(coupon.id)
         verify(couponIssueRepository).saveAndFlush(any(CouponIssue::class.java))
         verifyNoMoreInteractions(couponRepository)
     }
 
     @Test
-    fun `finalizeClaim rejects claim when issued count already reached coupon capacity`() {
+    fun `finalizeClaim rejects claim when coupon stock is exhausted`() {
         val coupon = Coupon(
             id = 1,
             name = "선착순 쿠폰",
@@ -82,17 +85,46 @@ class CouponClaimFinalizerTest {
             email = "member2@test.com",
             name = "tester2",
         )
-        val finalizer = CouponClaimFinalizer(couponIssueRepository, couponRepository, memberRepository)
+        val finalizer = CouponClaimFinalizer(couponIssueRepository, couponRepository, memberRepository, couponStockRepository)
 
-        given(couponRepository.findByIdForUpdate(coupon.id)).willReturn(coupon)
-        given(couponIssueRepository.countByCouponId(coupon.id)).willReturn(1L)
+        given(couponStockRepository.decrementIfAvailable(coupon.id)).willReturn(0)
+        given(couponStockRepository.findByCouponId(coupon.id)).willReturn(
+            com.firstcomecoupon.coupon.domain.CouponStock(couponId = coupon.id, remainingQuantity = 0),
+        )
 
         assertFailsWith<CouponSoldOutException> {
             finalizer.finalizeClaim(coupon.id, member.id)
         }
 
-        verify(couponRepository).findByIdForUpdate(coupon.id)
-        verify(couponIssueRepository).countByCouponId(coupon.id)
+        verify(couponStockRepository).decrementIfAvailable(coupon.id)
+        verify(couponIssueRepository, never()).saveAndFlush(any(CouponIssue::class.java))
+    }
+
+    @Test
+    fun `finalizeClaim throws when coupon exists but stock row is missing`() {
+        val coupon = Coupon(
+            id = 1,
+            name = "선착순 쿠폰",
+            totalQuantity = 1,
+            issueStartAt = LocalDateTime.now().minusHours(1),
+            issueEndAt = LocalDateTime.now().plusHours(1),
+        )
+        val member = Member(
+            id = 2,
+            email = "member2@test.com",
+            name = "tester2",
+        )
+        val finalizer = CouponClaimFinalizer(couponIssueRepository, couponRepository, memberRepository, couponStockRepository)
+
+        given(couponStockRepository.decrementIfAvailable(coupon.id)).willReturn(0)
+        given(couponStockRepository.findByCouponId(coupon.id)).willReturn(null)
+
+        assertFailsWith<NoSuchElementException> {
+            finalizer.finalizeClaim(coupon.id, member.id)
+        }
+
+        verify(couponStockRepository).decrementIfAvailable(coupon.id)
+        verify(couponStockRepository).findByCouponId(coupon.id)
         verify(couponIssueRepository, never()).saveAndFlush(any(CouponIssue::class.java))
     }
 }

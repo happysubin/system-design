@@ -2,9 +2,11 @@ package com.firstcomecoupon.coupon.api
 
 import com.firstcomecoupon.coupon.domain.Coupon
 import com.firstcomecoupon.coupon.domain.CouponIssue
+import com.firstcomecoupon.coupon.domain.CouponStock
 import com.firstcomecoupon.coupon.domain.Member
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponIssueRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponStockRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
 import com.firstcomecoupon.support.AbstractPostgresApiTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -43,9 +45,13 @@ class CouponClaimApiPostgresTest : AbstractPostgresApiTest() {
     @Autowired
     lateinit var stringRedisTemplate: StringRedisTemplate
 
+    @Autowired
+    lateinit var couponStockRepository: CouponStockRepository
+
     @BeforeEach
     fun setUp() {
         couponIssueRepository.deleteAll()
+        couponStockRepository.deleteAll()
         couponRepository.deleteAll()
         memberRepository.deleteAll()
         stringRedisTemplate.connectionFactory?.connection?.serverCommands()?.flushAll()
@@ -54,6 +60,7 @@ class CouponClaimApiPostgresTest : AbstractPostgresApiTest() {
     @Test
     fun `쿠폰 발급 API 호출 시 PostgreSQL에 CouponIssue가 저장되고 Redis 재고와 claim marker가 반영된다`() {
         val coupon = couponRepository.save(activeCoupon())
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = coupon.totalQuantity))
         val member = memberRepository.save(member("member@test.com"))
         stringRedisTemplate.opsForValue().set("coupon:stock:${coupon.id}", coupon.totalQuantity.toString())
 
@@ -73,6 +80,7 @@ class CouponClaimApiPostgresTest : AbstractPostgresApiTest() {
     @Test
     fun `같은 회원이 두 번 발급 요청하면 실제 Redis claim marker에 의해 이미 발급됨으로 처리된다`() {
         val coupon = couponRepository.save(activeCoupon())
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = coupon.totalQuantity))
         val member = memberRepository.save(member("duplicate@test.com"))
         stringRedisTemplate.opsForValue().set("coupon:stock:${coupon.id}", coupon.totalQuantity.toString())
 
@@ -105,6 +113,7 @@ class CouponClaimApiPostgresTest : AbstractPostgresApiTest() {
                 issueEndAt = LocalDateTime.now().plusHours(1),
             ),
         )
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = 0))
         val member1 = memberRepository.save(Member(email = "one@test.com", name = "one"))
         val member2 = memberRepository.save(Member(email = "two@test.com", name = "two"))
 

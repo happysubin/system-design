@@ -1,8 +1,10 @@
 package com.firstcomecoupon.coupon.infrastructure.reconciliation
 
 import com.firstcomecoupon.coupon.domain.Coupon
+import com.firstcomecoupon.coupon.domain.CouponStock
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponIssueRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponStockRepository
 import com.firstcomecoupon.coupon.infrastructure.reconciliation.CouponStockReconciliationService
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -29,6 +31,9 @@ class CouponStockReconciliationServiceTest {
     lateinit var couponIssueRepository: CouponIssueRepository
 
     @Mock
+    lateinit var couponStockRepository: CouponStockRepository
+
+    @Mock
     lateinit var stringRedisTemplate: StringRedisTemplate
 
     @Mock
@@ -39,13 +44,13 @@ class CouponStockReconciliationServiceTest {
         val now = LocalDateTime.of(2026, 3, 28, 12, 0)
         val coupon1 = coupon(id = 1L, totalQuantity = 10)
         val coupon2 = coupon(id = 2L, totalQuantity = 5)
-        val service = CouponStockReconciliationService(couponRepository, couponIssueRepository, stringRedisTemplate)
+        val service = CouponStockReconciliationService(couponRepository, couponIssueRepository, couponStockRepository, stringRedisTemplate)
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations)
         stubScanKeys(emptySet())
         given(couponRepository.findActiveCoupons(now)).willReturn(listOf(coupon1, coupon2))
-        given(couponIssueRepository.countByCouponId(coupon1.id)).willReturn(3L)
-        given(couponIssueRepository.countByCouponId(coupon2.id)).willReturn(1L)
+        given(couponStockRepository.findByCouponId(coupon1.id)).willReturn(CouponStock(couponId = coupon1.id, remainingQuantity = 7))
+        given(couponStockRepository.findByCouponId(coupon2.id)).willReturn(CouponStock(couponId = coupon2.id, remainingQuantity = 4))
 
         service.reconcileActiveCouponStocks(now)
 
@@ -57,12 +62,12 @@ class CouponStockReconciliationServiceTest {
     fun `reconciles active coupon stocks and deletes orphan claim markers`() {
         val now = LocalDateTime.of(2026, 3, 28, 12, 0)
         val coupon = coupon(id = 1L, totalQuantity = 10)
-        val service = CouponStockReconciliationService(couponRepository, couponIssueRepository, stringRedisTemplate)
+        val service = CouponStockReconciliationService(couponRepository, couponIssueRepository, couponStockRepository, stringRedisTemplate)
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations)
         stubScanKeys(setOf("coupon:claim:1:10", "coupon:claim:1:20"))
         given(couponRepository.findActiveCoupons(now)).willReturn(listOf(coupon))
-        given(couponIssueRepository.countByCouponId(coupon.id)).willReturn(1L)
+        given(couponStockRepository.findByCouponId(coupon.id)).willReturn(CouponStock(couponId = coupon.id, remainingQuantity = 9))
         given(couponIssueRepository.existsByCouponIdAndMemberId(coupon.id, 10L)).willReturn(true)
         given(couponIssueRepository.existsByCouponIdAndMemberId(coupon.id, 20L)).willReturn(false)
 
@@ -76,12 +81,12 @@ class CouponStockReconciliationServiceTest {
     @Test
     fun `reconciles single coupon stock from coupon issues`() {
         val coupon = coupon(id = 3L, totalQuantity = 20)
-        val service = CouponStockReconciliationService(couponRepository, couponIssueRepository, stringRedisTemplate)
+        val service = CouponStockReconciliationService(couponRepository, couponIssueRepository, couponStockRepository, stringRedisTemplate)
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations)
         stubScanKeys(emptySet())
         given(couponRepository.findById(coupon.id)).willReturn(java.util.Optional.of(coupon))
-        given(couponIssueRepository.countByCouponId(coupon.id)).willReturn(8L)
+        given(couponStockRepository.findByCouponId(coupon.id)).willReturn(CouponStock(couponId = coupon.id, remainingQuantity = 12))
 
         service.reconcileCouponStock(coupon.id)
 
@@ -91,18 +96,37 @@ class CouponStockReconciliationServiceTest {
     @Test
     fun `reconciles single coupon stock and deletes orphan claim markers`() {
         val coupon = coupon(id = 3L, totalQuantity = 20)
-        val service = CouponStockReconciliationService(couponRepository, couponIssueRepository, stringRedisTemplate)
+        val service = CouponStockReconciliationService(couponRepository, couponIssueRepository, couponStockRepository, stringRedisTemplate)
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations)
         stubScanKeys(setOf("coupon:claim:3:7"))
         given(couponRepository.findById(coupon.id)).willReturn(java.util.Optional.of(coupon))
-        given(couponIssueRepository.countByCouponId(coupon.id)).willReturn(2L)
+        given(couponStockRepository.findByCouponId(coupon.id)).willReturn(CouponStock(couponId = coupon.id, remainingQuantity = 18))
         given(couponIssueRepository.existsByCouponIdAndMemberId(coupon.id, 7L)).willReturn(false)
 
         service.reconcileCouponStock(coupon.id)
 
         verify(valueOperations).set("coupon:stock:${coupon.id}", "18")
         verify(stringRedisTemplate).delete("coupon:claim:3:7")
+    }
+
+    @Test
+    fun `reconciles active coupon stocks and backfills missing stock rows`() {
+        val now = LocalDateTime.of(2026, 3, 28, 12, 0)
+        val coupon = coupon(id = 4L, totalQuantity = 10)
+        val service = CouponStockReconciliationService(couponRepository, couponIssueRepository, couponStockRepository, stringRedisTemplate)
+
+        given(stringRedisTemplate.opsForValue()).willReturn(valueOperations)
+        stubScanKeys(emptySet())
+        given(couponRepository.findActiveCoupons(now)).willReturn(listOf(coupon))
+        given(couponStockRepository.findByCouponId(coupon.id)).willReturn(null)
+        given(couponIssueRepository.countByCouponId(coupon.id)).willReturn(3L)
+        given(couponStockRepository.save(any(CouponStock::class.java))).willAnswer { it.getArgument(0) }
+
+        service.reconcileActiveCouponStocks(now)
+
+        verify(couponStockRepository).save(org.mockito.ArgumentMatchers.any(CouponStock::class.java))
+        verify(valueOperations).set("coupon:stock:${coupon.id}", "7")
     }
 
     private fun coupon(id: Long, totalQuantity: Int): Coupon = Coupon(

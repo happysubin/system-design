@@ -3,7 +3,9 @@ package com.firstcomecoupon.coupon.application
 import com.firstcomecoupon.coupon.api.dto.CreateCouponRequest
 import com.firstcomecoupon.coupon.application.CouponApplicationService
 import com.firstcomecoupon.coupon.domain.Coupon
+import com.firstcomecoupon.coupon.domain.CouponStock
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponStockRepository
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.ArgumentCaptor
@@ -28,6 +30,9 @@ class CouponApplicationServiceTest {
     lateinit var stringRedisTemplate: StringRedisTemplate
 
     @Mock
+    lateinit var couponStockRepository: CouponStockRepository
+
+    @Mock
     lateinit var valueOperations: ValueOperations<String, String>
 
     @Test
@@ -46,7 +51,7 @@ class CouponApplicationServiceTest {
             issueEndAt = request.issueEndAt,
             createdAt = LocalDateTime.of(2026, 3, 27, 22, 0),
         )
-        val service = CouponApplicationService(couponRepository, stringRedisTemplate)
+        val service = CouponApplicationService(couponRepository, couponStockRepository, stringRedisTemplate)
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations)
         given(couponRepository.save(org.mockito.ArgumentMatchers.any(Coupon::class.java))).willReturn(savedCoupon)
@@ -86,15 +91,16 @@ class CouponApplicationServiceTest {
             issueStartAt = request.issueStartAt,
             issueEndAt = request.issueEndAt,
         )
-        val service = CouponApplicationService(couponRepository, stringRedisTemplate)
+        val service = CouponApplicationService(couponRepository, couponStockRepository, stringRedisTemplate)
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations)
         given(couponRepository.save(org.mockito.ArgumentMatchers.any(Coupon::class.java))).willReturn(savedCoupon)
 
         service.createCoupon(request)
 
-        val inOrder = inOrder(couponRepository, valueOperations)
+        val inOrder = inOrder(couponRepository, couponStockRepository, valueOperations)
         inOrder.verify(couponRepository).save(org.mockito.ArgumentMatchers.any(Coupon::class.java))
+        inOrder.verify(couponStockRepository).save(org.mockito.ArgumentMatchers.any(CouponStock::class.java))
         inOrder.verify(valueOperations).set("coupon:stock:${savedCoupon.id}", savedCoupon.totalQuantity.toString())
     }
 }

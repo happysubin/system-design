@@ -2,9 +2,11 @@ package com.firstcomecoupon.coupon.api
 
 import com.firstcomecoupon.coupon.domain.Coupon
 import com.firstcomecoupon.coupon.domain.CouponIssue
+import com.firstcomecoupon.coupon.domain.CouponStock
 import com.firstcomecoupon.coupon.domain.Member
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponIssueRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.CouponRepository
+import com.firstcomecoupon.coupon.infrastructure.persistence.CouponStockRepository
 import com.firstcomecoupon.coupon.infrastructure.persistence.MemberRepository
 import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimGateResult
 import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimRedisGate
@@ -44,6 +46,9 @@ class CouponClaimApiTest {
     @Autowired
     lateinit var couponIssueRepository: CouponIssueRepository
 
+    @Autowired
+    lateinit var couponStockRepository: CouponStockRepository
+
     @MockitoBean
     lateinit var couponClaimRedisGate: CouponClaimRedisGate
 
@@ -53,6 +58,7 @@ class CouponClaimApiTest {
     @BeforeEach
     fun setUp() {
         couponIssueRepository.deleteAll()
+        couponStockRepository.deleteAll()
         couponRepository.deleteAll()
         memberRepository.deleteAll()
     }
@@ -60,6 +66,7 @@ class CouponClaimApiTest {
     @Test
     fun `claims coupon and persists issuance in h2`() {
         val coupon = couponRepository.save(activeCoupon())
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = coupon.totalQuantity))
         val member = memberRepository.save(member())
 
         given(couponClaimRedisGate.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.PASSED)
@@ -81,6 +88,7 @@ class CouponClaimApiTest {
     @Test
     fun `returns sold out when redis gate rejects stock`() {
         val coupon = couponRepository.save(activeCoupon())
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = coupon.totalQuantity))
         val member = memberRepository.save(member())
 
         given(couponClaimRedisGate.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.SOLD_OUT)
@@ -99,6 +107,7 @@ class CouponClaimApiTest {
     @Test
     fun `returns already claimed when sql unique constraint rejects second issuance`() {
         val coupon = couponRepository.save(activeCoupon())
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = coupon.totalQuantity))
         val member = memberRepository.save(member())
 
         given(couponClaimRedisGate.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.PASSED)
@@ -132,6 +141,7 @@ class CouponClaimApiTest {
                 issueEndAt = LocalDateTime.now().plusHours(1),
             ),
         )
+        couponStockRepository.saveAndFlush(CouponStock(couponId = coupon.id, remainingQuantity = 0))
         val member1 = memberRepository.save(Member(email = "one@test.com", name = "one"))
         val member2 = memberRepository.save(Member(email = "two@test.com", name = "two"))
 
