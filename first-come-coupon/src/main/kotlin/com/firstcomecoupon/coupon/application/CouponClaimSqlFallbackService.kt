@@ -3,6 +3,7 @@ package com.firstcomecoupon.coupon.application
 import com.firstcomecoupon.coupon.domain.CouponClaimResult
 import com.firstcomecoupon.coupon.domain.CouponSoldOutException
 import org.hibernate.exception.ConstraintViolationException
+import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 
@@ -21,6 +22,9 @@ class CouponClaimSqlFallbackService(
             )
         } catch (_: CouponSoldOutException) {
             CouponClaimResult.SoldOut
+        } catch (exception: NoSuchElementException) {
+            logger.error("Coupon SQL fallback failed because coupon stock is missing. couponId={}, memberId={}", couponId, memberId, exception)
+            throw exception
         } catch (exception: DataIntegrityViolationException) {
             if (isDuplicateCouponClaim(exception)) {
                 CouponClaimResult.AlreadyClaimed
@@ -52,6 +56,7 @@ class CouponClaimSqlFallbackService(
     }
 
     companion object {
+        private val logger = LoggerFactory.getLogger(CouponClaimSqlFallbackService::class.java)
         private const val COUPON_MEMBER_UNIQUE_CONSTRAINT = "uk_coupon_issue_coupon_member"
         private const val UNIQUE_VIOLATION_SQL_STATE = "23505"
     }

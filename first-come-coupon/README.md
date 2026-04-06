@@ -120,7 +120,7 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
   - 이미 같은 회원의 claim marker가 있으면 `ALREADY_CLAIMED`로 종료된다.
   - Redis stock이 0 이하이면 `SOLD_OUT`으로 종료된다.
   - Redis stock key가 초기화되지 않았거나 유실된 경우 `INTERNAL_FAILURE`로 종료된다.
-  - Redis gate 호출 자체가 예외로 실패하면(예: Redis 연결 장애) 발급은 fail-closed로 `INTERNAL_FAILURE(HTTP 500)`로 종료된다. 이 경로에서는 SQL 최종 저장, rollback, reconciliation 단계로 진행하지 않는다.
+  - Redis gate 호출 자체가 예외로 실패하면(예: Redis 연결 장애) 기본 정책은 fail-closed로 `INTERNAL_FAILURE(HTTP 500)`로 종료된다. 단, 파일럿용 SQL fallback 토글이 켜져 있고 로컬 rate limit를 통과한 경우에는 제한된 SQL-only 경로로 내려갈 수 있다.
   - Redis gate 예외가 연속으로 발생하면 circuit breaker가 열리고, open 상태에서는 Redis를 다시 호출하지 않고 즉시 fail-fast 한다.
 - **Redis gate는 통과했지만 SQL 최종 저장 단계에서 실패하는 경우**
   - `coupon_stock` 감소에 실패하면 SQL에서 `SoldOut`으로 판정된다.
@@ -128,7 +128,8 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
   - 그 외에도 비중복 무결성 오류나 예기치 못한 런타임 오류가 발생할 수 있다.
 - **복원 로직**
   - Redis gate를 통과한 뒤 SQL 단계에서 실패하면 1차로 Redis rollback을 수행한다.
-  - rollback은 claim marker 삭제와 재고 복구를 Lua 스크립트 1회로 같은 원자 구간에서 처리한다.
+  - 일반 rollback은 claim marker 삭제와 재고 복구를 Lua 스크립트 1회로 같은 원자 구간에서 처리한다.
+  - SQL에서 품절이 확정된 경우에는 SOLD_OUT 전용 rollback을 사용해 Redis stock을 다시 열지 않고 `0`을 유지한 채 claim marker만 정리한다.
   - SQL에서 품절 판정, 비중복 무결성 오류, 예기치 못한 런타임 오류가 발생한 경우에는 rollback 이후 해당 coupon의 Redis stock을 SQL truth 기준으로 다시 reconciliation한다.
   - reconciliation은 Redis stock뿐 아니라 SQL 발급 이력이 없는 orphan claim marker도 함께 정리한다.
   - 같은 회원의 중복 발급은 Redis claim marker와 SQL unique 제약조건으로 함께 방어하며, 최종적으로는 `ALREADY_CLAIMED`로 수렴한다.
@@ -151,17 +152,16 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 ### 현재 동작(구현됨)
 
 - 현재 발급 경로는 `eligibility 확인 -> Redis gate -> SQL 최종 저장` 순서다.
-- Redis gate를 수행할 수 없으면 발급은 **fail-closed**로 종료되며 `INTERNAL_FAILURE`를 반환한다.
+- Redis gate를 수행할 수 없으면 기본 정책은 **fail-closed**로 종료되며 `INTERNAL_FAILURE`를 반환한다.
+- 다만 파일럿 단계에서는 운영 토글과 로컬(in-memory) rate limit를 전제로 한 제한적 SQL-only fallback이 구현되어 있다.
 - Redis gate 예외가 누적되면 circuit breaker가 열리고, open 상태에서는 Redis를 다시 호출하지 않고 즉시 fail-fast 한다.
-- 이 경우 SQL 최종 저장 단계는 실행하지 않는다.
+- fallback 토글이 꺼져 있으면 이 경우 SQL 최종 저장 단계는 실행하지 않는다.
 - 즉, circuit breaker는 장애를 복구하는 도구가 아니라, Redis 장애 시 불필요한 재시도와 지연을 줄여 애플리케이션과 DB를 보호하는 도구다.
 
 ### 확장 시 검토 가능(미구현)
 
 - 운영 요구가 커질 경우, 아래 옵션을 단계적으로 검토할 수 있다.
   1. **queue 기반 degraded mode**: 요청을 큐에 적재한 뒤 worker가 순차적으로 확정 처리
-- 현재는 파일럿 단계용으로 **운영 토글 + 로컬(in-memory) rate limit** 기반의 제한적 SQL fallback만 구현했다.
-- 즉 Redis 장애 시 기본 정책은 fail-closed를 유지하되, 운영자가 fallback 토글을 켠 경우에만 제한된 SQL-only 경로를 허용한다.
 - 단, 현재 SQL 최종화는 예전보다 가벼워졌지만 여전히 전면 SQL fallback은 고경합에서 DB 병목 위험이 크다.
 - 따라서 queue 기반 degraded mode는 TODO로 남기고, 추가 fallback 확장은 별도 부하 검증 후 도입한다.
 
