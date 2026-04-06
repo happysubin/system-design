@@ -4,3 +4,9 @@ spring:
   docker:
     compose:
       enabled: false
+
+coupon:
+  redis:
+    circuit-breaker:
+      failure-threshold: 3
+      open-duration: 30s

@@ -121,9 +121,10 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
   - Redis stock이 0 이하이면 `SOLD_OUT`으로 종료된다.
   - Redis stock key가 초기화되지 않았거나 유실된 경우 `INTERNAL_FAILURE`로 종료된다.
   - Redis gate 호출 자체가 예외로 실패하면(예: Redis 연결 장애) 발급은 fail-closed로 `INTERNAL_FAILURE(HTTP 500)`로 종료된다. 이 경로에서는 SQL 최종 저장, rollback, reconciliation 단계로 진행하지 않는다.
+  - Redis gate 예외가 연속으로 발생하면 circuit breaker가 열리고, open 상태에서는 Redis를 다시 호출하지 않고 즉시 fail-fast 한다.
 - **Redis gate는 통과했지만 SQL 최종 저장 단계에서 실패하는 경우**
-  - DB row lock 이후 발급 건수를 다시 확인했을 때 수량이 이미 다 찼으면 SQL에서 `SoldOut`으로 판정된다.
-  - 같은 회원에 대한 중복 저장이 발생하면 SQL unique 제약조건으로 최종 방어된다.
+  - `coupon_stock` 감소에 실패하면 SQL에서 `SoldOut`으로 판정된다.
+  - 같은 회원에 대한 중복 저장이 발생하면 SQL unique 제약조건으로 최종 방어된다. 이 경우 stock 차감은 같은 트랜잭션 롤백으로 함께 취소된다.
   - 그 외에도 비중복 무결성 오류나 예기치 못한 런타임 오류가 발생할 수 있다.
 - **복원 로직**
   - Redis gate를 통과한 뒤 SQL 단계에서 실패하면 1차로 Redis rollback을 수행한다.
@@ -138,8 +139,8 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 - Redis는 빠른 admission gate로 사용하고, 최종 정합성은 SQL에서 보장한다.
 - 중복 발급 방지는 Redis 1차 제어 + SQL unique 제약조건으로 이중 방어한다.
 - 발급 성공의 SQL truth는 `CouponIssue` 이력이다.
-- 최종 발급 확정은 SQL에서 coupon row lock + 발급 건수 재검증으로 수행하며, Redis는 admission gate 역할로 한정한다.
-- 발급 수와 남은 수량 조회는 `CouponIssue` aggregate와 `totalQuantity`를 기준으로 계산한다.
+- 최종 발급 확정은 SQL에서 `coupon_stock` 감소 + `coupon_issue` unique 저장으로 수행하며, Redis는 admission gate 역할로 한정한다.
+- 발급 수와 남은 수량 조회는 `coupon_stock.remaining_quantity`와 `CouponIssue` 이력을 함께 기준으로 계산한다.
 - Redis rollback은 Lua 스크립트 1회 호출로 처리하며, claim marker 삭제와 재고 복구를 같은 원자 구간에서 수행한다.
 - Redis stock은 runtime gate 용도이며, startup/periodic reconciliation에 더해 SQL 저장 실패(품절 판정, 비중복 무결성 오류, 예기치 못한 런타임 오류) 시 해당 coupon만 즉시 reconciliation한다.
 - 반대로 Redis gate 호출 예외(연결 장애 등)처럼 gate 이전 실패는 fail-closed로 종료하며, SQL 저장/복원 경로를 타지 않는다.
@@ -151,6 +152,7 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 
 - 현재 발급 경로는 `eligibility 확인 -> Redis gate -> SQL 최종 저장` 순서다.
 - Redis gate를 수행할 수 없으면 발급은 **fail-closed**로 종료되며 `INTERNAL_FAILURE`를 반환한다.
+- Redis gate 예외가 누적되면 circuit breaker가 열리고, open 상태에서는 Redis를 다시 호출하지 않고 즉시 fail-fast 한다.
 - 이 경우 SQL 최종 저장 단계는 실행하지 않는다.
 
 ### 확장 시 검토 가능(미구현)
@@ -158,7 +160,7 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 - 운영 요구가 커질 경우, 아래 옵션을 단계적으로 검토할 수 있다.
   1. **제한적 SQL fallback**: 비상 상황에서 낮은 트래픽 구간에 한해 Redis gate를 우회하고 SQL 최종 검증만 수행
   2. **degraded mode**: 요청을 즉시 확정하지 않고 임시 접수 후 복구 시점에 확정 처리
-- 단, 현재 SQL 최종화는 coupon row lock + `countByCouponId` 재검증 구조이므로, 고경합에서의 전면 SQL fallback은 병목 위험이 크다.
+- 단, 현재 SQL 최종화는 예전보다 가벼워졌지만 여전히 전면 SQL fallback은 고경합에서 DB 병목 위험이 크다.
 - 따라서 기본 정책은 fail-closed를 유지하고, fallback/degraded mode는 별도 부하 검증 후 도입한다.
 
 ## 현재 한계와 다음 개선 과제

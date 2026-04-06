@@ -2,7 +2,6 @@ package com.firstcomecoupon.coupon.application
 
 import com.firstcomecoupon.coupon.domain.CouponClaimResult
 import com.firstcomecoupon.coupon.domain.CouponSoldOutException
-import com.firstcomecoupon.coupon.infrastructure.persistence.CouponStockRepository
 import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimRedisGate
 import com.firstcomecoupon.coupon.infrastructure.reconciliation.CouponStockReconciliationService
 import org.hibernate.exception.ConstraintViolationException
@@ -14,7 +13,6 @@ class CouponClaimCompensationHandler(
     private val couponClaimFinalizer: CouponClaimFinalizer,
     private val couponClaimRedisGate: CouponClaimRedisGate,
     private val couponStockReconciliationService: CouponStockReconciliationService,
-    private val couponStockRepository: CouponStockRepository,
 ) {
 
     fun finalizeClaim(couponId: Long, memberId: Long): CouponClaimResult {
@@ -36,7 +34,6 @@ class CouponClaimCompensationHandler(
             couponClaimRedisGate.rollback(couponId, memberId)
 
             if (isDuplicateCouponClaim(exception)) {
-                restoreStock(couponId)
                 CouponClaimResult.AlreadyClaimed
             } else {
                 couponStockReconciliationService.reconcileCouponStock(couponId)
@@ -71,12 +68,6 @@ class CouponClaimCompensationHandler(
         }
 
         return false
-    }
-
-    private fun restoreStock(couponId: Long) {
-        val stock = couponStockRepository.findByCouponId(couponId) ?: throw NoSuchElementException("coupon stock not found")
-        stock.remainingQuantity += 1
-        couponStockRepository.saveAndFlush(stock)
     }
 
     companion object {

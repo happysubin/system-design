@@ -1,15 +1,12 @@
 package com.firstcomecoupon.coupon.application
 
 import com.firstcomecoupon.coupon.api.dto.IssueCouponRequest
-import com.firstcomecoupon.coupon.application.CouponClaimApplicationService
-import com.firstcomecoupon.coupon.application.CouponClaimCompensationHandler
-import com.firstcomecoupon.coupon.application.CouponClaimEligibilityChecker
-import com.firstcomecoupon.coupon.application.CouponClaimEligibilityResult
 import com.firstcomecoupon.coupon.domain.Coupon
 import com.firstcomecoupon.coupon.domain.CouponClaimResult
 import com.firstcomecoupon.coupon.domain.Member
 import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimGateResult
-import com.firstcomecoupon.coupon.infrastructure.redis.CouponClaimRedisGate
+import com.firstcomecoupon.coupon.infrastructure.redis.RedisClaimGateGuard
+import com.firstcomecoupon.coupon.infrastructure.redis.RedisGateUnavailableException
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.BDDMockito.given
@@ -28,7 +25,7 @@ class CouponClaimApplicationServiceTest {
     lateinit var couponClaimEligibilityChecker: CouponClaimEligibilityChecker
 
     @Mock
-    lateinit var couponClaimRedisGate: CouponClaimRedisGate
+    lateinit var redisClaimGateGuard: RedisClaimGateGuard
 
     @Mock
     lateinit var couponClaimCompensationHandler: CouponClaimCompensationHandler
@@ -38,7 +35,7 @@ class CouponClaimApplicationServiceTest {
         val coupon = activeCoupon()
         val member = member()
         val request = IssueCouponRequest(memberId = member.id)
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, couponClaimRedisGate, couponClaimCompensationHandler)
+        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
         val issuedResult = CouponClaimResult.Issued(
             issueId = 10,
             couponId = coupon.id,
@@ -49,7 +46,7 @@ class CouponClaimApplicationServiceTest {
         given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
             CouponClaimEligibilityResult.Eligible(coupon, member),
         )
-        given(couponClaimRedisGate.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.PASSED)
+        given(redisClaimGateGuard.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.PASSED)
         given(couponClaimCompensationHandler.finalizeClaim(coupon.id, member.id)).willReturn(issuedResult)
 
         val result = service.claimCoupon(coupon.id, request)
@@ -66,12 +63,12 @@ class CouponClaimApplicationServiceTest {
     fun `returns already claimed when redis gate rejects duplicate member`() {
         val coupon = activeCoupon()
         val member = member()
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, couponClaimRedisGate, couponClaimCompensationHandler)
+        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
 
         given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
             CouponClaimEligibilityResult.Eligible(coupon, member),
         )
-        given(couponClaimRedisGate.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.ALREADY_CLAIMED)
+        given(redisClaimGateGuard.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.ALREADY_CLAIMED)
 
         val result = service.claimCoupon(coupon.id, IssueCouponRequest(member.id))
 
@@ -83,12 +80,12 @@ class CouponClaimApplicationServiceTest {
     fun `returns sold out when redis gate rejects stock`() {
         val coupon = activeCoupon()
         val member = member()
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, couponClaimRedisGate, couponClaimCompensationHandler)
+        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
 
         given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
             CouponClaimEligibilityResult.Eligible(coupon, member),
         )
-        given(couponClaimRedisGate.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.SOLD_OUT)
+        given(redisClaimGateGuard.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.SOLD_OUT)
 
         val result = service.claimCoupon(coupon.id, IssueCouponRequest(member.id))
 
@@ -98,7 +95,7 @@ class CouponClaimApplicationServiceTest {
 
     @Test
     fun `returns ineligible result immediately when eligibility checker fails`() {
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, couponClaimRedisGate, couponClaimCompensationHandler)
+        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
 
         given(couponClaimEligibilityChecker.check(1L, 1L)).willReturn(
             CouponClaimEligibilityResult.Ineligible(CouponClaimResult.CouponNotFound),
@@ -107,7 +104,7 @@ class CouponClaimApplicationServiceTest {
         val result = service.claimCoupon(1L, IssueCouponRequest(1L))
 
         assertTrue(result is CouponClaimResult.CouponNotFound)
-        verify(couponClaimRedisGate, never()).tryClaim(1L, 1L)
+        verify(redisClaimGateGuard, never()).tryClaim(1L, 1L)
         verify(couponClaimCompensationHandler, never()).finalizeClaim(1L, 1L)
     }
 
@@ -115,7 +112,7 @@ class CouponClaimApplicationServiceTest {
     fun `delegates passed gate to compensation handler`() {
         val coupon = activeCoupon()
         val member = member()
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, couponClaimRedisGate, couponClaimCompensationHandler)
+        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
         val issuedResult = CouponClaimResult.Issued(
             issueId = 10,
             couponId = coupon.id,
@@ -126,13 +123,32 @@ class CouponClaimApplicationServiceTest {
         given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
             CouponClaimEligibilityResult.Eligible(coupon, member),
         )
-        given(couponClaimRedisGate.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.PASSED)
+        given(redisClaimGateGuard.tryClaim(coupon.id, member.id)).willReturn(CouponClaimGateResult.PASSED)
         given(couponClaimCompensationHandler.finalizeClaim(coupon.id, member.id)).willReturn(issuedResult)
 
         val result = service.claimCoupon(coupon.id, IssueCouponRequest(member.id))
 
         assertEquals(issuedResult, result)
         verify(couponClaimCompensationHandler).finalizeClaim(coupon.id, member.id)
+    }
+
+    @Test
+    fun `returns internal failure when redis gate guard reports redis unavailable`() {
+        val coupon = activeCoupon()
+        val member = member()
+        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
+
+        given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
+            CouponClaimEligibilityResult.Eligible(coupon, member),
+        )
+        given(redisClaimGateGuard.tryClaim(coupon.id, member.id)).willThrow(RedisGateUnavailableException())
+
+        val result = service.claimCoupon(coupon.id, IssueCouponRequest(member.id))
+
+        assertTrue(result is CouponClaimResult.InternalFailure)
+        result as CouponClaimResult.InternalFailure
+        assertEquals("redis service unavailable", result.message)
+        verify(couponClaimCompensationHandler, never()).finalizeClaim(coupon.id, member.id)
     }
 
     private fun activeCoupon(): Coupon = Coupon(
