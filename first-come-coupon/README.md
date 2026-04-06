@@ -159,10 +159,11 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 ### 확장 시 검토 가능(미구현)
 
 - 운영 요구가 커질 경우, 아래 옵션을 단계적으로 검토할 수 있다.
-  1. **제한적 SQL fallback**: 비상 상황에서 낮은 트래픽 구간에 한해 Redis gate를 우회하고 SQL 최종 검증만 수행
-  2. **degraded mode**: 요청을 즉시 확정하지 않고 임시 접수 후 복구 시점에 확정 처리
+  1. **queue 기반 degraded mode**: 요청을 큐에 적재한 뒤 worker가 순차적으로 확정 처리
+- 현재는 파일럿 단계용으로 **운영 토글 + 로컬(in-memory) rate limit** 기반의 제한적 SQL fallback만 구현했다.
+- 즉 Redis 장애 시 기본 정책은 fail-closed를 유지하되, 운영자가 fallback 토글을 켠 경우에만 제한된 SQL-only 경로를 허용한다.
 - 단, 현재 SQL 최종화는 예전보다 가벼워졌지만 여전히 전면 SQL fallback은 고경합에서 DB 병목 위험이 크다.
-- 따라서 기본 정책은 fail-closed를 유지하고, fallback/degraded mode는 별도 부하 검증 후 도입한다.
+- 따라서 queue 기반 degraded mode는 TODO로 남기고, 추가 fallback 확장은 별도 부하 검증 후 도입한다.
 
 ## 현재 한계와 다음 개선 과제
 

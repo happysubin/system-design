@@ -12,6 +12,9 @@ class CouponClaimApplicationService(
     private val couponClaimEligibilityChecker: CouponClaimEligibilityChecker,
     private val redisClaimGateGuard: RedisClaimGateGuard,
     private val couponClaimCompensationHandler: CouponClaimCompensationHandler,
+    private val couponClaimSqlFallbackService: CouponClaimSqlFallbackService,
+    private val couponClaimFallbackRateLimiter: CouponClaimFallbackRateLimiter,
+    private val couponFallbackProperties: CouponFallbackProperties,
 ) {
 
     fun claimCoupon(couponId: Long, request: IssueCouponRequest): CouponClaimResult {
@@ -31,9 +34,25 @@ class CouponClaimApplicationService(
                 CouponClaimGateResult.PASSED -> couponClaimCompensationHandler.finalizeClaim(couponId, eligible.member.id)
             }
         } catch (_: RedisGateUnavailableException) {
-            CouponClaimResult.InternalFailure("redis service unavailable")
+            handleRedisUnavailable(couponId, eligible.member.id)
         } catch (_: RuntimeException) {
             CouponClaimResult.InternalFailure("unexpected coupon claim failure")
+        }
+    }
+
+    private fun handleRedisUnavailable(couponId: Long, memberId: Long): CouponClaimResult {
+        if (!couponFallbackProperties.sqlOnlyEnabled) {
+            return CouponClaimResult.InternalFailure("redis service unavailable")
+        }
+
+        if (!couponClaimFallbackRateLimiter.tryAcquire()) {
+            return CouponClaimResult.InternalFailure("redis fallback rate limit exceeded")
+        }
+
+        return try {
+            couponClaimSqlFallbackService.claimWithoutRedis(couponId, memberId)
+        } finally {
+            couponClaimFallbackRateLimiter.release()
         }
     }
 }

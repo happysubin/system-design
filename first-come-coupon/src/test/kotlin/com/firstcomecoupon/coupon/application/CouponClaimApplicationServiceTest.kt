@@ -30,12 +30,18 @@ class CouponClaimApplicationServiceTest {
     @Mock
     lateinit var couponClaimCompensationHandler: CouponClaimCompensationHandler
 
+    @Mock
+    lateinit var couponClaimSqlFallbackService: CouponClaimSqlFallbackService
+
+    @Mock
+    lateinit var couponClaimFallbackRateLimiter: CouponClaimFallbackRateLimiter
+
     @Test
     fun `issues coupon when redis gate passes and compensation handler succeeds`() {
         val coupon = activeCoupon()
         val member = member()
         val request = IssueCouponRequest(memberId = member.id)
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
+        val service = service()
         val issuedResult = CouponClaimResult.Issued(
             issueId = 10,
             couponId = coupon.id,
@@ -63,7 +69,7 @@ class CouponClaimApplicationServiceTest {
     fun `returns already claimed when redis gate rejects duplicate member`() {
         val coupon = activeCoupon()
         val member = member()
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
+        val service = service()
 
         given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
             CouponClaimEligibilityResult.Eligible(coupon, member),
@@ -80,7 +86,7 @@ class CouponClaimApplicationServiceTest {
     fun `returns sold out when redis gate rejects stock`() {
         val coupon = activeCoupon()
         val member = member()
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
+        val service = service()
 
         given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
             CouponClaimEligibilityResult.Eligible(coupon, member),
@@ -95,7 +101,7 @@ class CouponClaimApplicationServiceTest {
 
     @Test
     fun `returns ineligible result immediately when eligibility checker fails`() {
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
+        val service = service()
 
         given(couponClaimEligibilityChecker.check(1L, 1L)).willReturn(
             CouponClaimEligibilityResult.Ineligible(CouponClaimResult.CouponNotFound),
@@ -112,7 +118,7 @@ class CouponClaimApplicationServiceTest {
     fun `delegates passed gate to compensation handler`() {
         val coupon = activeCoupon()
         val member = member()
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
+        val service = service()
         val issuedResult = CouponClaimResult.Issued(
             issueId = 10,
             couponId = coupon.id,
@@ -133,10 +139,10 @@ class CouponClaimApplicationServiceTest {
     }
 
     @Test
-    fun `returns internal failure when redis gate guard reports redis unavailable`() {
+    fun `returns internal failure when redis gate guard reports redis unavailable and fallback is disabled`() {
         val coupon = activeCoupon()
         val member = member()
-        val service = CouponClaimApplicationService(couponClaimEligibilityChecker, redisClaimGateGuard, couponClaimCompensationHandler)
+        val service = service()
 
         given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
             CouponClaimEligibilityResult.Eligible(coupon, member),
@@ -149,7 +155,64 @@ class CouponClaimApplicationServiceTest {
         result as CouponClaimResult.InternalFailure
         assertEquals("redis service unavailable", result.message)
         verify(couponClaimCompensationHandler, never()).finalizeClaim(coupon.id, member.id)
+        verify(couponClaimSqlFallbackService, never()).claimWithoutRedis(coupon.id, member.id)
     }
+
+    @Test
+    fun `uses sql fallback when redis is unavailable and fallback is enabled`() {
+        val coupon = activeCoupon()
+        val member = member()
+        val fallbackResult = CouponClaimResult.Issued(
+            issueId = 20,
+            couponId = coupon.id,
+            memberId = member.id,
+            issuedAt = LocalDateTime.now(),
+        )
+        val service = service(sqlOnlyEnabled = true)
+
+        given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
+            CouponClaimEligibilityResult.Eligible(coupon, member),
+        )
+        given(redisClaimGateGuard.tryClaim(coupon.id, member.id)).willThrow(RedisGateUnavailableException())
+        given(couponClaimFallbackRateLimiter.tryAcquire()).willReturn(true)
+        given(couponClaimSqlFallbackService.claimWithoutRedis(coupon.id, member.id)).willReturn(fallbackResult)
+
+        val result = service.claimCoupon(coupon.id, IssueCouponRequest(member.id))
+
+        assertEquals(fallbackResult, result)
+        verify(couponClaimSqlFallbackService).claimWithoutRedis(coupon.id, member.id)
+        verify(couponClaimFallbackRateLimiter).release()
+    }
+
+    @Test
+    fun `returns internal failure when redis is unavailable and fallback rate limit is exceeded`() {
+        val coupon = activeCoupon()
+        val member = member()
+        val service = service(sqlOnlyEnabled = true)
+
+        given(couponClaimEligibilityChecker.check(coupon.id, member.id)).willReturn(
+            CouponClaimEligibilityResult.Eligible(coupon, member),
+        )
+        given(redisClaimGateGuard.tryClaim(coupon.id, member.id)).willThrow(RedisGateUnavailableException())
+        given(couponClaimFallbackRateLimiter.tryAcquire()).willReturn(false)
+
+        val result = service.claimCoupon(coupon.id, IssueCouponRequest(member.id))
+
+        assertTrue(result is CouponClaimResult.InternalFailure)
+        result as CouponClaimResult.InternalFailure
+        assertEquals("redis fallback rate limit exceeded", result.message)
+        verify(couponClaimSqlFallbackService, never()).claimWithoutRedis(coupon.id, member.id)
+    }
+
+    private fun service(sqlOnlyEnabled: Boolean = false): CouponClaimApplicationService =
+        CouponClaimApplicationService(
+            couponClaimEligibilityChecker,
+            redisClaimGateGuard,
+            couponClaimCompensationHandler,
+            couponClaimSqlFallbackService,
+            couponClaimFallbackRateLimiter,
+            CouponFallbackProperties().apply { this.sqlOnlyEnabled = sqlOnlyEnabled },
+        )
 
     private fun activeCoupon(): Coupon = Coupon(
         id = 1,

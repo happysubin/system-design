@@ -6,7 +6,13 @@ spring:
       enabled: false
 
 coupon:
+  fallback:
+    sql-only-enabled: false
+    max-concurrent-claims: 2
   redis:
     circuit-breaker:
-      failure-threshold: 3
+      failure-rate-threshold: 50
+      sliding-window-size: 10
+      minimum-number-of-calls: 5
       open-duration: 30s
+      permitted-calls-in-half-open-state: 1
