@@ -1,9 +1,7 @@
 package com.paymentlab.payment.application
 
-import com.paymentlab.payment.domain.Order
 import com.paymentlab.payment.domain.PaymentAttempt
 import com.paymentlab.payment.domain.PaymentStatus
-import com.paymentlab.payment.infrastructure.persistence.OrderRepository
 import com.paymentlab.payment.infrastructure.persistence.PaymentAttemptRepository
 import com.paymentlab.payment.infrastructure.pg.PgClient
 import org.junit.jupiter.api.Test
@@ -21,9 +19,6 @@ import kotlin.test.assertEquals
 class PaymentApprovalApplicationServiceTest {
 
     @Mock
-    lateinit var orderRepository: OrderRepository
-
-    @Mock
     lateinit var paymentAttemptRepository: PaymentAttemptRepository
 
     @Mock
@@ -31,22 +26,18 @@ class PaymentApprovalApplicationServiceTest {
 
     @Test
     fun `ready 상태의 결제 시도를 승인 요청하면 pg 호출 후 pending 상태로 바꾼다`() {
-        val order = Order(
-            id = 1,
-            merchantOrderId = "order-1",
-            amount = 15000,
-        )
         val paymentAttempt = PaymentAttempt(
             id = 10,
-            order = order,
+            orderId = 1,
+            merchantOrderId = "order-1",
             idempotencyKey = "idem-1",
-            amount = order.amount,
+            amount = 15000,
             status = PaymentStatus.READY,
         )
-        val service = PaymentApplicationService(orderRepository, paymentAttemptRepository, pgClient)
+        val service = PaymentApplicationService(paymentAttemptRepository, pgClient)
 
         given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
-        given(pgClient.approve(paymentAttempt.id, order.merchantOrderId, paymentAttempt.amount)).willReturn("pg-tx-1")
+        given(pgClient.approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)).willReturn("pg-tx-1")
 
         val result = service.approvePaymentAttempt(paymentAttempt.id)
 
@@ -55,24 +46,20 @@ class PaymentApprovalApplicationServiceTest {
         assertEquals("pg-tx-1", result.pgTransactionId)
         assertEquals(PaymentStatus.PENDING, paymentAttempt.status)
         assertEquals("pg-tx-1", paymentAttempt.pgTransactionId)
-        verify(pgClient).approve(paymentAttempt.id, order.merchantOrderId, paymentAttempt.amount)
+        verify(pgClient).approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)
     }
 
     @Test
     fun `ready가 아닌 결제 시도는 승인 요청할 수 없다`() {
-        val order = Order(
-            id = 1,
-            merchantOrderId = "order-1",
-            amount = 15000,
-        )
         val paymentAttempt = PaymentAttempt(
             id = 10,
-            order = order,
+            orderId = 1,
+            merchantOrderId = "order-1",
             idempotencyKey = "idem-1",
-            amount = order.amount,
+            amount = 15000,
             status = PaymentStatus.PENDING,
         )
-        val service = PaymentApplicationService(orderRepository, paymentAttemptRepository, pgClient)
+        val service = PaymentApplicationService(paymentAttemptRepository, pgClient)
 
         given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
 
@@ -80,6 +67,6 @@ class PaymentApprovalApplicationServiceTest {
             service.approvePaymentAttempt(paymentAttempt.id)
         }
 
-        verify(pgClient, never()).approve(paymentAttempt.id, order.merchantOrderId, paymentAttempt.amount)
+        verify(pgClient, never()).approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)
     }
 }

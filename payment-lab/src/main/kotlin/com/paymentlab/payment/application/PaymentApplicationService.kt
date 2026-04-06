@@ -6,7 +6,6 @@ import com.paymentlab.payment.api.dto.ApprovePaymentAttemptResponse
 import com.paymentlab.payment.api.dto.ReconcilePaymentAttemptResponse
 import com.paymentlab.payment.domain.PaymentAttempt
 import com.paymentlab.payment.domain.PaymentStatus
-import com.paymentlab.payment.infrastructure.persistence.OrderRepository
 import com.paymentlab.payment.infrastructure.persistence.PaymentAttemptRepository
 import com.paymentlab.payment.infrastructure.pg.PgClient
 import org.springframework.stereotype.Service
@@ -14,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class PaymentApplicationService(
-    private val orderRepository: OrderRepository,
     private val paymentAttemptRepository: PaymentAttemptRepository,
     private val pgClient: PgClient,
 ) {
@@ -25,26 +23,24 @@ class PaymentApplicationService(
         if (existingAttempt != null) {
             return CreatePaymentAttemptResponse(
                 paymentAttemptId = existingAttempt.id,
-                orderId = existingAttempt.order.id,
+                orderId = existingAttempt.orderId,
                 status = existingAttempt.status,
             )
         }
 
-        val order = orderRepository.findById(request.orderId)
-            .orElseThrow { IllegalArgumentException("order not found: ${request.orderId}") }
-
         val savedAttempt = paymentAttemptRepository.save(
             PaymentAttempt(
-                order = order,
+                orderId = request.orderId,
+                merchantOrderId = request.merchantOrderId,
                 idempotencyKey = request.idempotencyKey,
-                amount = order.amount,
+                amount = request.amount,
                 status = PaymentStatus.READY,
             ),
         )
 
         return CreatePaymentAttemptResponse(
             paymentAttemptId = savedAttempt.id,
-            orderId = savedAttempt.order.id,
+            orderId = savedAttempt.orderId,
             status = savedAttempt.status,
         )
     }
@@ -60,7 +56,7 @@ class PaymentApplicationService(
 
         val pgTransactionId = pgClient.approve(
             paymentAttempt.id,
-            paymentAttempt.order.merchantOrderId,
+            paymentAttempt.merchantOrderId,
             paymentAttempt.amount,
         )
 

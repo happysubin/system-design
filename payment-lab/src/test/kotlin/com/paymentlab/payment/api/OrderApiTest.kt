@@ -17,10 +17,10 @@ class OrderApiTest {
         val orderApplicationService = mock(OrderApplicationService::class.java)
         val mockMvc = MockMvcBuilders.standaloneSetup(OrderController(orderApplicationService)).build()
 
-        given(orderApplicationService.createOrder(CreateOrderRequest(merchantOrderId = "order-1", amount = 15000))).willReturn(
+        given(orderApplicationService.createOrder(CreateOrderRequest(amount = 15000))).willReturn(
             CreateOrderResponse(
                 orderId = 1,
-                merchantOrderId = "order-1",
+                merchantOrderId = "generated-order-key",
                 amount = 15000,
             ),
         )
@@ -29,7 +29,6 @@ class OrderApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
-                  "merchantOrderId": "order-1",
                   "amount": 15000
                 }
             """.trimIndent()
@@ -37,7 +36,7 @@ class OrderApiTest {
             .andExpect {
                 status { isCreated() }
                 jsonPath("$.orderId") { value(1) }
-                jsonPath("$.merchantOrderId") { value("order-1") }
+                jsonPath("$.merchantOrderId") { value("generated-order-key") }
                 jsonPath("$.amount") { value(15000) }
             }
     }

@@ -1,92 +1,85 @@
 package com.paymentlab.payment.application
 
 import com.paymentlab.payment.api.dto.CreatePaymentAttemptRequest
-import com.paymentlab.payment.domain.Order
 import com.paymentlab.payment.domain.PaymentAttempt
 import com.paymentlab.payment.domain.PaymentStatus
-import com.paymentlab.payment.infrastructure.persistence.OrderRepository
 import com.paymentlab.payment.infrastructure.persistence.PaymentAttemptRepository
-import org.junit.jupiter.api.BeforeEach
+import com.paymentlab.payment.infrastructure.pg.StubPgClient
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.ActiveProfiles
+import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.BDDMockito.given
+import org.mockito.ArgumentCaptor
+import org.mockito.Mock
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
+import org.mockito.junit.jupiter.MockitoExtension
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
-@SpringBootTest
-@ActiveProfiles("test")
+@ExtendWith(MockitoExtension::class)
 class PaymentApplicationServiceTest {
 
-    @Autowired
-    lateinit var paymentApplicationService: PaymentApplicationService
-
-    @Autowired
-    lateinit var orderRepository: OrderRepository
-
-    @Autowired
+    @Mock
     lateinit var paymentAttemptRepository: PaymentAttemptRepository
 
-    @BeforeEach
-    fun setUp() {
-        paymentAttemptRepository.deleteAll()
-        orderRepository.deleteAll()
-    }
-
     @Test
-    fun `기존 결제 시도가 없으면 주문 기준으로 결제 시도를 생성한다`() {
-        val order = orderRepository.save(
-            Order(
-            merchantOrderId = "order-1",
-            amount = 15000,
-            ),
-        )
+    fun `기존 결제 시도가 없으면 외부 주문 정보를 기준으로 결제 시도를 생성한다`() {
+        val paymentApplicationService = PaymentApplicationService(paymentAttemptRepository, StubPgClient())
+
+        given(paymentAttemptRepository.findByIdempotencyKey("idem-1")).willReturn(null)
+        given(paymentAttemptRepository.save(org.mockito.ArgumentMatchers.any(PaymentAttempt::class.java))).willAnswer { invocation ->
+            val saved = invocation.getArgument(0, PaymentAttempt::class.java)
+            saved.id = 10
+            saved
+        }
 
         val result = paymentApplicationService.createPaymentAttempt(
             CreatePaymentAttemptRequest(
-                orderId = order.id,
+                orderId = 1,
+                merchantOrderId = "order-1",
+                amount = 15000,
                 idempotencyKey = "idem-1",
             ),
         )
 
-        val savedAttempt = paymentAttemptRepository.findById(result.paymentAttemptId).orElse(null)
-
-        assertNotNull(savedAttempt)
-        assertEquals(order.id, savedAttempt.order.id)
-        assertEquals("idem-1", savedAttempt.idempotencyKey)
-        assertEquals(order.amount, savedAttempt.amount)
-        assertEquals(PaymentStatus.READY, savedAttempt.status)
-        assertEquals(order.id, result.orderId)
+        assertNotNull(result)
+        val captor = ArgumentCaptor.forClass(PaymentAttempt::class.java)
+        verify(paymentAttemptRepository).save(captor.capture())
+        assertEquals(1, captor.value.orderId)
+        assertEquals("order-1", captor.value.merchantOrderId)
+        assertEquals(15000, captor.value.amount)
+        assertEquals("idem-1", captor.value.idempotencyKey)
+        assertEquals(PaymentStatus.READY, captor.value.status)
+        assertEquals(1, result.orderId)
         assertEquals(PaymentStatus.READY, result.status)
     }
 
     @Test
     fun `같은 idempotency key가 이미 있으면 기존 결제 시도를 그대로 반환한다`() {
-        val order = orderRepository.save(
-            Order(
+        val paymentApplicationService = PaymentApplicationService(paymentAttemptRepository, StubPgClient())
+        val existingAttempt = PaymentAttempt(
+            id = 10,
+            orderId = 1,
             merchantOrderId = "order-1",
+            idempotencyKey = "idem-1",
             amount = 15000,
-            ),
+            status = PaymentStatus.READY,
         )
-        val existingAttempt = paymentAttemptRepository.save(
-            PaymentAttempt(
-                order = order,
-                idempotencyKey = "idem-1",
-                amount = order.amount,
-                status = PaymentStatus.READY,
-            ),
-        )
+
+        given(paymentAttemptRepository.findByIdempotencyKey("idem-1")).willReturn(existingAttempt)
 
         val result = paymentApplicationService.createPaymentAttempt(
             CreatePaymentAttemptRequest(
-                orderId = order.id,
+                orderId = 1,
+                merchantOrderId = "order-1",
+                amount = 15000,
                 idempotencyKey = "idem-1",
             ),
         )
 
         assertEquals(existingAttempt.id, result.paymentAttemptId)
-        assertEquals(order.id, result.orderId)
+        assertEquals(1, result.orderId)
         assertEquals(PaymentStatus.READY, result.status)
-        assertEquals(1, paymentAttemptRepository.count())
+        verify(paymentAttemptRepository, never()).save(org.mockito.ArgumentMatchers.any(PaymentAttempt::class.java))
     }
 }

@@ -4,12 +4,9 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
-import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.JoinColumn
-import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.LocalDateTime
 
@@ -20,16 +17,34 @@ class PaymentAttempt(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long = 0,
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false)
-    var order: Order = Order(),
+    /**
+     * 외부 주문서 시스템이 관리하는 내부 주문 식별자다.
+     * 결제 서비스 안에서는 이 값을 주문 원본을 참조하는 최소 기준으로만 사용한다.
+     */
+    @Column(name = "order_id", nullable = false)
+    var orderId: Long = 0,
 
+    /**
+     * PG와 주고받을 때 사용하는 비즈니스 주문 키다.
+     * 내부 PK를 직접 노출하지 않고, 주문 대사와 운영 추적에 사용한다.
+     */
+    @Column(name = "merchant_order_id", nullable = false, length = 100)
+    var merchantOrderId: String = "",
+
+    /**
+     * 같은 결제 시작 요청이 여러 번 들어와도 한 번만 처리하기 위한 요청 키다.
+     * 주문 자체를 식별하는 값이 아니라, 결제 시도 요청을 식별하는 값이다.
+     */
     @Column(name = "idempotency_key", nullable = false, length = 120)
     var idempotencyKey: String = "",
 
     @Column(name = "pg_transaction_id", length = 120)
     var pgTransactionId: String? = null,
 
+    /**
+     * 결제 시작 시점에 확정한 금액 스냅샷이다.
+     * 이후 원본 주문 금액이 바뀌더라도 이 결제 시도가 어떤 금액으로 시작됐는지 보존한다.
+     */
     @Column(nullable = false)
     var amount: Long = 0,
 

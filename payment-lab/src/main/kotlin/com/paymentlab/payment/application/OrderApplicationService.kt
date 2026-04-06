@@ -6,6 +6,7 @@ import com.paymentlab.payment.domain.Order
 import com.paymentlab.payment.infrastructure.persistence.OrderRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @Service
 class OrderApplicationService(
@@ -16,7 +17,7 @@ class OrderApplicationService(
     fun createOrder(request: CreateOrderRequest): CreateOrderResponse {
         val savedOrder = orderRepository.save(
             Order(
-                merchantOrderId = request.merchantOrderId,
+                merchantOrderId = UUID.randomUUID().toString(),
                 amount = request.amount,
             ),
         )
