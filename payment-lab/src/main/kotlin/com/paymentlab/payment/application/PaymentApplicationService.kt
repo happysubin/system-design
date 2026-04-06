@@ -8,6 +8,7 @@ import com.paymentlab.payment.domain.PaymentAttempt
 import com.paymentlab.payment.domain.PaymentStatus
 import com.paymentlab.payment.infrastructure.persistence.PaymentAttemptRepository
 import com.paymentlab.payment.infrastructure.pg.PgClient
+import com.paymentlab.payment.infrastructure.redis.CheckoutKeyStore
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -15,11 +16,12 @@ import org.springframework.transaction.annotation.Transactional
 class PaymentApplicationService(
     private val paymentAttemptRepository: PaymentAttemptRepository,
     private val pgClient: PgClient,
+    private val checkoutKeyStore: CheckoutKeyStore,
 ) {
 
     @Transactional
     fun createPaymentAttempt(request: CreatePaymentAttemptRequest): CreatePaymentAttemptResponse {
-        val existingAttempt = paymentAttemptRepository.findByIdempotencyKey(request.idempotencyKey)
+        val existingAttempt = paymentAttemptRepository.findByCheckoutKey(request.checkoutKey)
         if (existingAttempt != null) {
             return CreatePaymentAttemptResponse(
                 paymentAttemptId = existingAttempt.id,
@@ -28,11 +30,21 @@ class PaymentApplicationService(
             )
         }
 
+        val isValidCheckoutKey = checkoutKeyStore.consumeIfValid(
+            request.checkoutKey,
+            request.orderId,
+            request.merchantOrderId,
+            request.amount,
+        )
+        if (!isValidCheckoutKey) {
+            throw IllegalArgumentException("invalid checkout key: ${request.checkoutKey}")
+        }
+
         val savedAttempt = paymentAttemptRepository.save(
             PaymentAttempt(
                 orderId = request.orderId,
                 merchantOrderId = request.merchantOrderId,
-                idempotencyKey = request.idempotencyKey,
+                checkoutKey = request.checkoutKey,
                 amount = request.amount,
                 status = PaymentStatus.READY,
             ),

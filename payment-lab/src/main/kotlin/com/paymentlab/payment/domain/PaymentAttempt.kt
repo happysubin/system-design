@@ -31,12 +31,8 @@ class PaymentAttempt(
     @Column(name = "merchant_order_id", nullable = false, length = 100)
     var merchantOrderId: String = "",
 
-    /**
-     * 같은 결제 시작 요청이 여러 번 들어와도 한 번만 처리하기 위한 요청 키다.
-     * 주문 자체를 식별하는 값이 아니라, 결제 시도 요청을 식별하는 값이다.
-     */
-    @Column(name = "idempotency_key", nullable = false, length = 120)
-    var idempotencyKey: String = "",
+    @Column(name = "checkout_key", nullable = false, length = 120)
+    var checkoutKey: String = "",
 
     @Column(name = "pg_transaction_id", length = 120)
     var pgTransactionId: String? = null,

@@ -18,7 +18,7 @@ class PaymentApiTest {
         val paymentApplicationService = mock(PaymentApplicationService::class.java)
         val mockMvc = MockMvcBuilders.standaloneSetup(PaymentController(paymentApplicationService)).build()
 
-        given(paymentApplicationService.createPaymentAttempt(CreatePaymentAttemptRequest(orderId = 1, merchantOrderId = "order-1", amount = 15000, idempotencyKey = "idem-1"))).willReturn(
+        given(paymentApplicationService.createPaymentAttempt(CreatePaymentAttemptRequest(orderId = 1, merchantOrderId = "order-1", amount = 15000, checkoutKey = "checkout-1"))).willReturn(
             CreatePaymentAttemptResponse(
                 paymentAttemptId = 10,
                 orderId = 1,
@@ -33,7 +33,7 @@ class PaymentApiTest {
                   "orderId": 1,
                   "merchantOrderId": "order-1",
                   "amount": 15000,
-                  "idempotencyKey": "idem-1"
+                  "checkoutKey": "checkout-1"
                 }
             """.trimIndent()
         }
