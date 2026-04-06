@@ -154,6 +154,7 @@ curl -X POST http://localhost:8080/api/v1/coupons/1/claim \
 - Redis gate를 수행할 수 없으면 발급은 **fail-closed**로 종료되며 `INTERNAL_FAILURE`를 반환한다.
 - Redis gate 예외가 누적되면 circuit breaker가 열리고, open 상태에서는 Redis를 다시 호출하지 않고 즉시 fail-fast 한다.
 - 이 경우 SQL 최종 저장 단계는 실행하지 않는다.
+- 즉, circuit breaker는 장애를 복구하는 도구가 아니라, Redis 장애 시 불필요한 재시도와 지연을 줄여 애플리케이션과 DB를 보호하는 도구다.
 
 ### 확장 시 검토 가능(미구현)
 

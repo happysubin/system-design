@@ -157,7 +157,7 @@ class CouponClaimApiTest {
             .andExpect(jsonPath("$.result").value("SOLD_OUT"))
 
         assertEquals(1, couponIssueRepository.count())
-        verify(couponClaimRedisGate, times(1)).rollback(coupon.id, member2.id)
+        verify(couponClaimRedisGate, times(1)).rollbackSoldOut(coupon.id, member2.id)
     }
 
     private fun activeCoupon(): Coupon = Coupon(

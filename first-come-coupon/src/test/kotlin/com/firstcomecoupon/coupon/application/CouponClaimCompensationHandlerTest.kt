@@ -99,7 +99,7 @@ class CouponClaimCompensationHandlerTest {
         val result = handler.finalizeClaim(1L, 1L)
 
         assertTrue(result is CouponClaimResult.SoldOut)
-        verify(couponClaimRedisGate).rollback(1L, 1L)
+        verify(couponClaimRedisGate).rollbackSoldOut(1L, 1L)
         verify(couponStockReconciliationService).reconcileCouponStock(1L)
     }
 

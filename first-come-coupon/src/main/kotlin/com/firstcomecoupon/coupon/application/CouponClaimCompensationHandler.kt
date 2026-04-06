@@ -25,9 +25,7 @@ class CouponClaimCompensationHandler(
                 issuedAt = issue.issuedAt,
             )
         } catch (_: CouponSoldOutException) {
-            // Redis gate는 통과했지만 SQL 최종 검증에서 수량 초과가 드러난 경우다.
-            // 이미 감소시킨 Redis 재고와 claim marker를 원복해야 drift가 커지지 않는다.
-            couponClaimRedisGate.rollback(couponId, memberId)
+            couponClaimRedisGate.rollbackSoldOut(couponId, memberId)
             couponStockReconciliationService.reconcileCouponStock(couponId)
             CouponClaimResult.SoldOut
         } catch (exception: DataIntegrityViolationException) {

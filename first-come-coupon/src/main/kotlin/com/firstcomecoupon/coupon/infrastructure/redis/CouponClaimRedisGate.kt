@@ -44,6 +44,13 @@ class CouponClaimRedisGate(
         )
     }
 
+    fun rollbackSoldOut(couponId: Long, memberId: Long) {
+        stringRedisTemplate.execute(
+            SOLD_OUT_ROLLBACK_SCRIPT,
+            listOf(stockKey(couponId), claimKey(couponId, memberId)),
+        )
+    }
+
     private fun stockKey(couponId: Long): String = "coupon:stock:$couponId"
 
     private fun claimKey(couponId: Long, memberId: Long): String = "coupon:claim:$couponId:$memberId"
@@ -95,6 +102,21 @@ class CouponClaimRedisGate(
                     redis.call('INCR', KEYS[1])
                 end
 
+                redis.call('DEL', KEYS[2])
+                return 1
+                """.trimIndent(),
+            )
+        }
+
+        private val SOLD_OUT_ROLLBACK_SCRIPT = DefaultRedisScript<Long>().apply {
+            setResultType(Long::class.java)
+            setScriptText(
+                """
+                if redis.call('EXISTS', KEYS[2]) == 0 then
+                    return 0
+                end
+
+                redis.call('SET', KEYS[1], '0')
                 redis.call('DEL', KEYS[2])
                 return 1
                 """.trimIndent(),
