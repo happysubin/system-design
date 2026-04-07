@@ -8,6 +8,15 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
+/**
+ * PG 웹훅을 검증하고 최종 결제 상태를 반영하는 application service다.
+ *
+ * 현재는 토스페이먼츠 기준으로
+ * - `merchantOrderId` 일치 여부
+ * - 저장된 webhook secret과 요청 secret 일치 여부
+ * 를 먼저 확인한 뒤,
+ * `PENDING` 상태의 결제만 `DONE/FAILED`로 확정한다.
+ */
 class PaymentWebhookApplicationService(
     private val paymentAttemptRepository: PaymentAttemptRepository,
 ) {
