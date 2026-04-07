@@ -15,4 +15,8 @@ class StubPgClient : PgClient {
     override fun query(pgTransactionId: String): String {
         return "SUCCESS"
     }
+
+    override fun queryByMerchantOrderId(merchantOrderId: String): String {
+        return "SUCCESS"
+    }
 }

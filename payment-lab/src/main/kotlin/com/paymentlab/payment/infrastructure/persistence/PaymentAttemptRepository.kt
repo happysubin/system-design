@@ -40,6 +40,21 @@ interface PaymentAttemptRepository : JpaRepository<PaymentAttempt, Long> {
           and pa.status = :currentStatus
         """,
     )
+    fun updateStatusIfCurrentStatusOnly(
+        @Param("paymentAttemptId") paymentAttemptId: Long,
+        @Param("currentStatus") currentStatus: PaymentStatus,
+        @Param("nextStatus") nextStatus: PaymentStatus,
+    ): Int
+
+    @Modifying
+    @Query(
+        """
+        update PaymentAttempt pa
+        set pa.status = :nextStatus
+        where pa.id = :paymentAttemptId
+          and pa.status = :currentStatus
+        """,
+    )
     fun updateStatusIfCurrentStatus(
         @Param("paymentAttemptId") paymentAttemptId: Long,
         @Param("currentStatus") currentStatus: PaymentStatus,
