@@ -2,6 +2,7 @@ package com.paymentlab.payment.api
 
 import com.paymentlab.payment.api.dto.CreatePaymentAttemptRequest
 import com.paymentlab.payment.api.dto.ApprovePaymentAttemptResponse
+import com.paymentlab.payment.application.PaymentFacade
 import com.paymentlab.payment.application.PaymentApplicationService
 import com.paymentlab.payment.domain.PaymentStatus
 import org.junit.jupiter.api.Test
@@ -15,12 +16,13 @@ class PaymentApiTest {
 
     @Test
     fun `결제 시작 요청을 받아 바로 승인 요청까지 진행하고 201 응답을 반환한다`() {
+        val paymentFacade = mock(PaymentFacade::class.java)
         val paymentApplicationService = mock(PaymentApplicationService::class.java)
-        val mockMvc = MockMvcBuilders.standaloneSetup(PaymentController(paymentApplicationService))
+        val mockMvc = MockMvcBuilders.standaloneSetup(PaymentController(paymentFacade, paymentApplicationService))
             .setControllerAdvice(PaymentErrorHandler())
             .build()
 
-        given(paymentApplicationService.startPayment(CreatePaymentAttemptRequest(orderId = 1, merchantOrderId = "order-1", amount = 15000, checkoutKey = "checkout-1"))).willReturn(
+        given(paymentFacade.startPayment(CreatePaymentAttemptRequest(orderId = 1, merchantOrderId = "order-1", amount = 15000, checkoutKey = "checkout-1"))).willReturn(
             ApprovePaymentAttemptResponse(
                 paymentAttemptId = 10,
                 status = PaymentStatus.PENDING,
@@ -49,12 +51,13 @@ class PaymentApiTest {
 
     @Test
     fun `유효하지 않은 checkout key면 400 응답을 반환한다`() {
+        val paymentFacade = mock(PaymentFacade::class.java)
         val paymentApplicationService = mock(PaymentApplicationService::class.java)
-        val mockMvc = MockMvcBuilders.standaloneSetup(PaymentController(paymentApplicationService))
+        val mockMvc = MockMvcBuilders.standaloneSetup(PaymentController(paymentFacade, paymentApplicationService))
             .setControllerAdvice(PaymentErrorHandler())
             .build()
 
-        given(paymentApplicationService.startPayment(CreatePaymentAttemptRequest(orderId = 1, merchantOrderId = "order-1", amount = 15000, checkoutKey = "invalid-checkout")))
+        given(paymentFacade.startPayment(CreatePaymentAttemptRequest(orderId = 1, merchantOrderId = "order-1", amount = 15000, checkoutKey = "invalid-checkout")))
             .willThrow(IllegalArgumentException("invalid checkout key: invalid-checkout"))
 
         mockMvc.post("/api/v1/payments") {

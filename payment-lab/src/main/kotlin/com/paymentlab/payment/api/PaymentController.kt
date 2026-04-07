@@ -3,6 +3,7 @@ package com.paymentlab.payment.api
 import com.paymentlab.payment.api.dto.CreatePaymentAttemptRequest
 import com.paymentlab.payment.api.dto.ApprovePaymentAttemptResponse
 import com.paymentlab.payment.api.dto.ReconcilePaymentAttemptResponse
+import com.paymentlab.payment.application.PaymentFacade
 import com.paymentlab.payment.application.PaymentApplicationService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PostMapping
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController
  * 외부 주문 시스템이 준비한 주문 정보와 checkoutKey를 입력으로 받는다.
  */
 class PaymentController(
+    private val paymentFacade: PaymentFacade,
     private val paymentApplicationService: PaymentApplicationService,
 ) {
 
@@ -29,7 +31,7 @@ class PaymentController(
      * 외부 주문 정보와 checkoutKey를 검증한 뒤 결제 시도를 만들고 바로 PG 승인 요청까지 진행한다.
      */
     fun startPayment(@RequestBody request: CreatePaymentAttemptRequest): ApprovePaymentAttemptResponse {
-        return paymentApplicationService.startPayment(request)
+        return paymentFacade.startPayment(request)
     }
 
     @PostMapping("/{paymentAttemptId}/reconcile")
@@ -38,6 +40,6 @@ class PaymentController(
      * `PENDING` 상태의 결제 시도만 `DONE` 또는 `FAILED`로 확정한다.
      */
     fun reconcilePaymentAttempt(@PathVariable paymentAttemptId: Long): ReconcilePaymentAttemptResponse {
-        return paymentApplicationService.reconcilePaymentAttempt(paymentAttemptId)
+        return paymentFacade.reconcilePaymentAttempt(paymentAttemptId)
     }
 }

@@ -1,6 +1,7 @@
 package com.paymentlab.payment.api
 
 import com.paymentlab.payment.api.dto.ReconcilePaymentAttemptResponse
+import com.paymentlab.payment.application.PaymentFacade
 import com.paymentlab.payment.application.PaymentApplicationService
 import com.paymentlab.payment.domain.PaymentStatus
 import org.junit.jupiter.api.Test
@@ -13,10 +14,11 @@ class PaymentReconciliationApiTest {
 
     @Test
     fun `재확정 요청을 받아 최종 상태를 반환한다`() {
+        val paymentFacade = mock(PaymentFacade::class.java)
         val paymentApplicationService = mock(PaymentApplicationService::class.java)
-        val mockMvc = MockMvcBuilders.standaloneSetup(PaymentController(paymentApplicationService)).build()
+        val mockMvc = MockMvcBuilders.standaloneSetup(PaymentController(paymentFacade, paymentApplicationService)).build()
 
-        given(paymentApplicationService.reconcilePaymentAttempt(10)).willReturn(
+        given(paymentFacade.reconcilePaymentAttempt(10)).willReturn(
             ReconcilePaymentAttemptResponse(
                 paymentAttemptId = 10,
                 status = PaymentStatus.DONE,
