@@ -7,6 +7,7 @@ import com.paymentlab.payment.api.dto.ReconcilePaymentAttemptResponse
 import com.paymentlab.payment.domain.PaymentAttempt
 import com.paymentlab.payment.domain.PaymentStatus
 import com.paymentlab.payment.infrastructure.persistence.PaymentAttemptRepository
+import com.paymentlab.payment.infrastructure.pg.PgApproveOutcome
 import com.paymentlab.payment.infrastructure.pg.PgClient
 import com.paymentlab.payment.infrastructure.redis.CheckoutKeyStore
 import org.springframework.stereotype.Service
@@ -78,10 +79,15 @@ class PaymentApplicationService(
             paymentAttempt.amount,
         )
 
+        val nextStatus = when (approveResult.outcome) {
+            PgApproveOutcome.PENDING -> PaymentStatus.PENDING
+            PgApproveOutcome.DECLINED -> PaymentStatus.DECLINED
+        }
+
         val updated = paymentAttemptRepository.updateStatusAndPgTransactionIdAndWebhookSecretIfCurrentStatus(
             paymentAttempt.id,
             PaymentStatus.READY,
-            PaymentStatus.PENDING,
+            nextStatus,
             approveResult.pgTransactionId,
             approveResult.webhookSecret,
         )
@@ -91,7 +97,7 @@ class PaymentApplicationService(
 
         return ApprovePaymentAttemptResponse(
             paymentAttemptId = paymentAttempt.id,
-            status = PaymentStatus.PENDING,
+            status = nextStatus,
             pgTransactionId = approveResult.pgTransactionId,
         )
     }

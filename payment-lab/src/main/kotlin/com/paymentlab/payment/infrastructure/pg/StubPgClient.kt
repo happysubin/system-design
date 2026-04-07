@@ -8,6 +8,7 @@ class StubPgClient : PgClient {
         return PgApproveResult(
             pgTransactionId = "stub-pg-$paymentAttemptId",
             webhookSecret = "stub-secret-$paymentAttemptId",
+            outcome = PgApproveOutcome.PENDING,
         )
     }
 

@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param
 interface PaymentAttemptRepository : JpaRepository<PaymentAttempt, Long> {
     fun findByCheckoutKey(checkoutKey: String): PaymentAttempt?
     fun findByPgTransactionId(pgTransactionId: String): PaymentAttempt?
+    fun findAllByStatus(status: PaymentStatus): List<PaymentAttempt>
 
     @Modifying
     @Query(
