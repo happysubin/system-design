@@ -13,6 +13,7 @@ import org.mockito.Mock
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.never
+import org.mockito.Mockito.mock
 import org.mockito.junit.jupiter.MockitoExtension
 import java.util.Optional
 import kotlin.test.assertEquals
@@ -23,72 +24,70 @@ class PaymentReconciliationApplicationServiceTest {
     @Mock
     lateinit var paymentAttemptRepository: PaymentAttemptRepository
 
-    @Mock
-    lateinit var pgClient: PgClient
-
-    @Mock
-    lateinit var checkoutKeyStore: CheckoutKeyStore
-
     @Test
-    fun `pending 결제 시도를 PG 조회 결과가 성공이면 done으로 확정한다`() {
+    fun `pending 결제 시도 조회는 현재 상태가 pending일 때만 허용한다`() {
         val paymentAttempt = pendingAttempt()
-        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
+        val service = PaymentApplicationService(paymentAttemptRepository, mock(), mock())
 
         given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
-        given(pgClient.query(paymentAttempt.pgTransactionId!!)).willReturn("SUCCESS")
-        doReturn(1).`when`(paymentAttemptRepository)
-            .updateStatusIfCurrentStatus(paymentAttempt.id, PaymentStatus.PENDING, PaymentStatus.DONE)
 
-        val result = service.reconcilePaymentAttempt(paymentAttempt.id)
+        val result = service.loadPendingPaymentAttempt(paymentAttempt.id)
 
-        assertEquals(paymentAttempt.id, result.paymentAttemptId)
-        assertEquals(PaymentStatus.DONE, result.status)
-        verify(pgClient).query("pg-tx-1")
-    }
-
-    @Test
-    fun `pending 결제 시도를 PG 조회 결과가 실패면 failed로 확정한다`() {
-        val paymentAttempt = pendingAttempt()
-        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
-
-        given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
-        given(pgClient.query(paymentAttempt.pgTransactionId!!)).willReturn("FAIL")
-        doReturn(1).`when`(paymentAttemptRepository)
-            .updateStatusIfCurrentStatus(paymentAttempt.id, PaymentStatus.PENDING, PaymentStatus.FAILED)
-
-        val result = service.reconcilePaymentAttempt(paymentAttempt.id)
-
-        assertEquals(PaymentStatus.FAILED, result.status)
-        verify(pgClient).query("pg-tx-1")
+        assertEquals(paymentAttempt.id, result.id)
+        assertEquals(PaymentStatus.PENDING, result.status)
     }
 
     @Test
     fun `pending이 아닌 결제 시도는 재확정할 수 없다`() {
         val paymentAttempt = pendingAttempt().apply { status = PaymentStatus.DONE }
-        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
+        val service = PaymentApplicationService(paymentAttemptRepository, mock(), mock())
 
         given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
 
         assertThrows<IllegalStateException> {
-            service.reconcilePaymentAttempt(paymentAttempt.id)
+            service.loadPendingPaymentAttempt(paymentAttempt.id)
         }
-
-        verify(pgClient, never()).query("pg-tx-1")
     }
 
     @Test
-    fun `재확정 시점에 이미 다른 경로가 최종 확정했으면 상태 전이를 중단한다`() {
+    fun `재확정 결과 반영은 pending에서 done으로 바꿀 수 있다`() {
         val paymentAttempt = pendingAttempt()
-        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
+        val service = PaymentApplicationService(paymentAttemptRepository, mock(), mock())
 
-        given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
-        given(pgClient.query(paymentAttempt.pgTransactionId!!)).willReturn("SUCCESS")
+        val successService = PaymentApplicationService(paymentAttemptRepository, mock(), mock())
+        doReturn(1).`when`(paymentAttemptRepository)
+            .updateStatusIfCurrentStatus(paymentAttempt.id, PaymentStatus.PENDING, PaymentStatus.DONE)
+
+        val result = successService.applyReconcileResult(paymentAttempt.id, "SUCCESS")
+
+        assertEquals(paymentAttempt.id, result.paymentAttemptId)
+        assertEquals(PaymentStatus.DONE, result.status)
+    }
+
+    @Test
+    fun `재확정 결과 반영 시 다른 경로가 먼저 확정했으면 상태 전이를 중단한다`() {
+        val paymentAttempt = pendingAttempt()
+        val service = PaymentApplicationService(paymentAttemptRepository, mock(), mock())
+
         doReturn(0).`when`(paymentAttemptRepository)
             .updateStatusIfCurrentStatus(paymentAttempt.id, PaymentStatus.PENDING, PaymentStatus.DONE)
 
         assertThrows<IllegalStateException> {
-            service.reconcilePaymentAttempt(paymentAttempt.id)
+            service.applyReconcileResult(paymentAttempt.id, "SUCCESS")
         }
+    }
+
+    @Test
+    fun `pending 결제에 pgTransactionId가 없으면 merchantOrderId 기준으로 재확정 대상을 조회할 수 있다`() {
+        val paymentAttempt = pendingAttempt().apply { pgTransactionId = null }
+        val service = PaymentApplicationService(paymentAttemptRepository, mock(), mock())
+
+        given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
+
+        val result = service.loadPendingPaymentAttempt(paymentAttempt.id)
+
+        assertEquals("order-1", result.merchantOrderId)
+        assertEquals(PaymentStatus.PENDING, result.status)
     }
 
     private fun pendingAttempt(): PaymentAttempt = PaymentAttempt(
