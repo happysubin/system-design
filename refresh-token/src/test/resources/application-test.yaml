@@ -1,0 +1,12 @@
+app:
+  auth:
+    secret: 01234567890123456789012345678901
+    issuer: refresh-token-test
+    access-token-ttl: 15m
+    refresh-token-ttl: 14d
+    redis-key:
+      environment: test
+      app-name: refresh-token
+    demo-user:
+      username: demo
+      password: password
