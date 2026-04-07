@@ -18,7 +18,7 @@ class PaymentWebhookApiTest {
         val paymentWebhookApplicationService = mock(PaymentWebhookApplicationService::class.java)
         val mockMvc = MockMvcBuilders.standaloneSetup(WebhookController(paymentWebhookApplicationService)).build()
 
-        given(paymentWebhookApplicationService.handleWebhook(PaymentWebhookRequest(pgTransactionId = "pg-tx-1", result = "SUCCESS"))).willReturn(
+        given(paymentWebhookApplicationService.handleWebhook(PaymentWebhookRequest(merchantOrderId = "order-1", pgTransactionId = "pg-tx-1", secret = "secret-1", result = "SUCCESS"))).willReturn(
             PaymentWebhookResponse(
                 paymentAttemptId = 10,
                 status = PaymentStatus.DONE,
@@ -29,7 +29,9 @@ class PaymentWebhookApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
+                  "merchantOrderId": "order-1",
                   "pgTransactionId": "pg-tx-1",
+                  "secret": "secret-1",
                   "result": "SUCCESS"
                 }
             """.trimIndent()
@@ -38,6 +40,32 @@ class PaymentWebhookApiTest {
                 status { isOk() }
                 jsonPath("$.paymentAttemptId") { value(10) }
                 jsonPath("$.status") { value("DONE") }
+            }
+    }
+
+    @Test
+    fun `webhook secret 검증 실패면 400 응답을 반환한다`() {
+        val paymentWebhookApplicationService = mock(PaymentWebhookApplicationService::class.java)
+        val mockMvc = MockMvcBuilders.standaloneSetup(WebhookController(paymentWebhookApplicationService))
+            .setControllerAdvice(PaymentErrorHandler())
+            .build()
+
+        given(paymentWebhookApplicationService.handleWebhook(PaymentWebhookRequest(merchantOrderId = "order-1", pgTransactionId = "pg-tx-1", secret = "wrong-secret", result = "SUCCESS")))
+            .willThrow(IllegalArgumentException("invalid webhook secret"))
+
+        mockMvc.post("/api/v1/payment-webhooks") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "merchantOrderId": "order-1",
+                  "pgTransactionId": "pg-tx-1",
+                  "secret": "wrong-secret",
+                  "result": "SUCCESS"
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isBadRequest() }
             }
     }
 }

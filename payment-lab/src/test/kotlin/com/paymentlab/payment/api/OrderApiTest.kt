@@ -21,6 +21,7 @@ class OrderApiTest {
             CreateOrderResponse(
                 orderId = 1,
                 merchantOrderId = "generated-order-key",
+                checkoutKey = "checkout-1",
                 amount = 15000,
             ),
         )
@@ -37,6 +38,7 @@ class OrderApiTest {
                 status { isCreated() }
                 jsonPath("$.orderId") { value(1) }
                 jsonPath("$.merchantOrderId") { value("generated-order-key") }
+                jsonPath("$.checkoutKey") { value("checkout-1") }
                 jsonPath("$.amount") { value(15000) }
             }
     }

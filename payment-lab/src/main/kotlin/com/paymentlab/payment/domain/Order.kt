@@ -15,7 +15,7 @@ class Order(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long = 0,
 
-    @Column(name = "merchant_order_id", nullable = false, length = 100)
+    @Column(name = "merchant_order_id", nullable = false, length = 100, unique = true)
     var merchantOrderId: String = "",
 
     @Column(nullable = false)

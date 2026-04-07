@@ -12,9 +12,11 @@ import org.mockito.Mock
 import org.junit.jupiter.api.assertThrows
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.never
+import org.mockito.Mockito.doReturn
 import org.mockito.junit.jupiter.MockitoExtension
 import java.util.Optional
 import kotlin.test.assertEquals
+import com.paymentlab.payment.infrastructure.pg.PgApproveResult
 
 @ExtendWith(MockitoExtension::class)
 class PaymentApprovalApplicationServiceTest {
@@ -41,15 +43,17 @@ class PaymentApprovalApplicationServiceTest {
         val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
 
         given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
-        given(pgClient.approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)).willReturn("pg-tx-1")
+        given(pgClient.approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)).willReturn(
+            PgApproveResult(pgTransactionId = "pg-tx-1", webhookSecret = "secret-1"),
+        )
+        doReturn(1).`when`(paymentAttemptRepository)
+            .updateStatusAndPgTransactionIdAndWebhookSecretIfCurrentStatus(paymentAttempt.id, PaymentStatus.READY, PaymentStatus.PENDING, "pg-tx-1", "secret-1")
 
         val result = service.approvePaymentAttempt(paymentAttempt.id)
 
         assertEquals(paymentAttempt.id, result.paymentAttemptId)
         assertEquals(PaymentStatus.PENDING, result.status)
         assertEquals("pg-tx-1", result.pgTransactionId)
-        assertEquals(PaymentStatus.PENDING, paymentAttempt.status)
-        assertEquals("pg-tx-1", paymentAttempt.pgTransactionId)
         verify(pgClient).approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)
     }
 
@@ -72,5 +76,29 @@ class PaymentApprovalApplicationServiceTest {
         }
 
         verify(pgClient, never()).approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)
+    }
+
+    @Test
+    fun `동시성 충돌로 ready에서 pending 전이가 실패하면 승인 요청을 거부한다`() {
+        val paymentAttempt = PaymentAttempt(
+            id = 10,
+            orderId = 1,
+            merchantOrderId = "order-1",
+            checkoutKey = "checkout-1",
+            amount = 15000,
+            status = PaymentStatus.READY,
+        )
+        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
+
+        given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
+        given(pgClient.approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)).willReturn(
+            PgApproveResult(pgTransactionId = "pg-tx-1", webhookSecret = "secret-1"),
+        )
+        doReturn(0).`when`(paymentAttemptRepository)
+            .updateStatusAndPgTransactionIdAndWebhookSecretIfCurrentStatus(paymentAttempt.id, PaymentStatus.READY, PaymentStatus.PENDING, "pg-tx-1", "secret-1")
+
+        assertThrows<IllegalStateException> {
+            service.approvePaymentAttempt(paymentAttempt.id)
+        }
     }
 }

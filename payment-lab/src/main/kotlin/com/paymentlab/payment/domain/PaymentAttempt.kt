@@ -31,11 +31,14 @@ class PaymentAttempt(
     @Column(name = "merchant_order_id", nullable = false, length = 100)
     var merchantOrderId: String = "",
 
-    @Column(name = "checkout_key", nullable = false, length = 120)
+    @Column(name = "checkout_key", nullable = false, length = 120, unique = true)
     var checkoutKey: String = "",
 
-    @Column(name = "pg_transaction_id", length = 120)
+    @Column(name = "pg_transaction_id", length = 120, unique = true)
     var pgTransactionId: String? = null,
+
+    @Column(name = "webhook_secret", length = 120)
+    var webhookSecret: String? = null,
 
     /**
      * 결제 시작 시점에 확정한 금액 스냅샷이다.

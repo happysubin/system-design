@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.BDDMockito.given
 import org.mockito.Mock
+import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.junit.jupiter.MockitoExtension
@@ -27,24 +28,27 @@ class PaymentWebhookApplicationServiceTest {
             merchantOrderId = "order-1",
             checkoutKey = "checkout-1",
             pgTransactionId = "pg-tx-1",
+            webhookSecret = "secret-1",
             amount = 15000,
             status = PaymentStatus.PENDING,
         )
         val service = PaymentWebhookApplicationService(paymentAttemptRepository)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
+        doReturn(1).`when`(paymentAttemptRepository)
+            .updateStatusByPgTransactionIdIfCurrentStatus("pg-tx-1", PaymentStatus.PENDING, PaymentStatus.DONE)
 
         val result = service.handleWebhook(
             PaymentWebhookRequest(
+                merchantOrderId = "order-1",
                 pgTransactionId = "pg-tx-1",
+                secret = "secret-1",
                 result = "SUCCESS",
             ),
         )
 
         assertEquals(10, result.paymentAttemptId)
         assertEquals(PaymentStatus.DONE, result.status)
-        assertEquals(PaymentStatus.DONE, paymentAttempt.status)
-        verify(paymentAttemptRepository).save(paymentAttempt)
     }
 
     @Test
@@ -55,23 +59,26 @@ class PaymentWebhookApplicationServiceTest {
             merchantOrderId = "order-1",
             checkoutKey = "checkout-1",
             pgTransactionId = "pg-tx-1",
+            webhookSecret = "secret-1",
             amount = 15000,
             status = PaymentStatus.PENDING,
         )
         val service = PaymentWebhookApplicationService(paymentAttemptRepository)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
+        doReturn(1).`when`(paymentAttemptRepository)
+            .updateStatusByPgTransactionIdIfCurrentStatus("pg-tx-1", PaymentStatus.PENDING, PaymentStatus.FAILED)
 
         val result = service.handleWebhook(
             PaymentWebhookRequest(
+                merchantOrderId = "order-1",
                 pgTransactionId = "pg-tx-1",
+                secret = "secret-1",
                 result = "FAIL",
             ),
         )
 
         assertEquals(PaymentStatus.FAILED, result.status)
-        assertEquals(PaymentStatus.FAILED, paymentAttempt.status)
-        verify(paymentAttemptRepository).save(paymentAttempt)
     }
 
     @Test
@@ -82,6 +89,7 @@ class PaymentWebhookApplicationServiceTest {
             merchantOrderId = "order-1",
             checkoutKey = "checkout-1",
             pgTransactionId = "pg-tx-1",
+            webhookSecret = "secret-1",
             amount = 15000,
             status = PaymentStatus.DONE,
         )
@@ -91,7 +99,9 @@ class PaymentWebhookApplicationServiceTest {
 
         val result = service.handleWebhook(
             PaymentWebhookRequest(
+                merchantOrderId = "order-1",
                 pgTransactionId = "pg-tx-1",
+                secret = "secret-1",
                 result = "SUCCESS",
             ),
         )
@@ -109,6 +119,7 @@ class PaymentWebhookApplicationServiceTest {
             merchantOrderId = "order-1",
             checkoutKey = "checkout-1",
             pgTransactionId = "pg-tx-1",
+            webhookSecret = "secret-1",
             amount = 15000,
             status = PaymentStatus.FAILED,
         )
@@ -118,7 +129,9 @@ class PaymentWebhookApplicationServiceTest {
 
         val result = service.handleWebhook(
             PaymentWebhookRequest(
+                merchantOrderId = "order-1",
                 pgTransactionId = "pg-tx-1",
+                secret = "secret-1",
                 result = "FAIL",
             ),
         )
@@ -136,6 +149,7 @@ class PaymentWebhookApplicationServiceTest {
             merchantOrderId = "order-1",
             checkoutKey = "checkout-1",
             pgTransactionId = "pg-tx-1",
+            webhookSecret = "secret-1",
             amount = 15000,
             status = PaymentStatus.READY,
         )
@@ -146,7 +160,9 @@ class PaymentWebhookApplicationServiceTest {
         kotlin.test.assertFailsWith<IllegalStateException> {
             service.handleWebhook(
                 PaymentWebhookRequest(
+                    merchantOrderId = "order-1",
                     pgTransactionId = "pg-tx-1",
+                    secret = "secret-1",
                     result = "SUCCESS",
                 ),
             )
@@ -163,6 +179,7 @@ class PaymentWebhookApplicationServiceTest {
             merchantOrderId = "order-1",
             checkoutKey = "checkout-1",
             pgTransactionId = "pg-tx-1",
+            webhookSecret = "secret-1",
             amount = 15000,
             status = PaymentStatus.CANCELLED,
         )
@@ -172,7 +189,9 @@ class PaymentWebhookApplicationServiceTest {
 
         val result = service.handleWebhook(
             PaymentWebhookRequest(
+                merchantOrderId = "order-1",
                 pgTransactionId = "pg-tx-1",
+                secret = "secret-1",
                 result = "SUCCESS",
             ),
         )
@@ -180,5 +199,91 @@ class PaymentWebhookApplicationServiceTest {
         assertEquals(PaymentStatus.CANCELLED, result.status)
         assertEquals(PaymentStatus.CANCELLED, paymentAttempt.status)
         verify(paymentAttemptRepository, never()).save(paymentAttempt)
+    }
+
+    @Test
+    fun `웹훅 처리 시점에 이미 다른 경로가 최종 확정했으면 상태 전이를 중단한다`() {
+        val paymentAttempt = PaymentAttempt(
+            id = 10,
+            orderId = 1,
+            merchantOrderId = "order-1",
+            checkoutKey = "checkout-1",
+            pgTransactionId = "pg-tx-1",
+            webhookSecret = "secret-1",
+            amount = 15000,
+            status = PaymentStatus.PENDING,
+        )
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+
+        given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
+        doReturn(0).`when`(paymentAttemptRepository)
+            .updateStatusByPgTransactionIdIfCurrentStatus("pg-tx-1", PaymentStatus.PENDING, PaymentStatus.DONE)
+
+        kotlin.test.assertFailsWith<IllegalStateException> {
+            service.handleWebhook(
+                PaymentWebhookRequest(
+                    merchantOrderId = "order-1",
+                    pgTransactionId = "pg-tx-1",
+                    secret = "secret-1",
+                    result = "SUCCESS",
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `secret이 다르면 웹훅을 거부한다`() {
+        val paymentAttempt = PaymentAttempt(
+            id = 10,
+            orderId = 1,
+            merchantOrderId = "order-1",
+            checkoutKey = "checkout-1",
+            pgTransactionId = "pg-tx-1",
+            webhookSecret = "secret-1",
+            amount = 15000,
+            status = PaymentStatus.PENDING,
+        )
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+
+        given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
+
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            service.handleWebhook(
+                PaymentWebhookRequest(
+                    merchantOrderId = "order-1",
+                    pgTransactionId = "pg-tx-1",
+                    secret = "wrong-secret",
+                    result = "SUCCESS",
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `merchantOrderId가 다르면 웹훅을 거부한다`() {
+        val paymentAttempt = PaymentAttempt(
+            id = 10,
+            orderId = 1,
+            merchantOrderId = "order-1",
+            checkoutKey = "checkout-1",
+            pgTransactionId = "pg-tx-1",
+            webhookSecret = "secret-1",
+            amount = 15000,
+            status = PaymentStatus.PENDING,
+        )
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+
+        given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
+
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            service.handleWebhook(
+                PaymentWebhookRequest(
+                    merchantOrderId = "different-order",
+                    pgTransactionId = "pg-tx-1",
+                    secret = "secret-1",
+                    result = "SUCCESS",
+                ),
+            )
+        }
     }
 }

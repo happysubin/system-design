@@ -20,6 +20,12 @@ class PaymentApplicationService(
 ) {
 
     @Transactional
+    fun startPayment(request: CreatePaymentAttemptRequest): ApprovePaymentAttemptResponse {
+        val paymentAttempt = createPaymentAttempt(request)
+        return approvePaymentAttempt(paymentAttempt.paymentAttemptId)
+    }
+
+    @Transactional
     fun createPaymentAttempt(request: CreatePaymentAttemptRequest): CreatePaymentAttemptResponse {
         val existingAttempt = paymentAttemptRepository.findByCheckoutKey(request.checkoutKey)
         if (existingAttempt != null) {
@@ -66,20 +72,27 @@ class PaymentApplicationService(
             throw IllegalStateException("payment attempt is not ready: ${paymentAttempt.status}")
         }
 
-        val pgTransactionId = pgClient.approve(
+        val approveResult = pgClient.approve(
             paymentAttempt.id,
             paymentAttempt.merchantOrderId,
             paymentAttempt.amount,
         )
 
-        paymentAttempt.status = PaymentStatus.PENDING
-        paymentAttempt.pgTransactionId = pgTransactionId
-        paymentAttemptRepository.save(paymentAttempt)
+        val updated = paymentAttemptRepository.updateStatusAndPgTransactionIdAndWebhookSecretIfCurrentStatus(
+            paymentAttempt.id,
+            PaymentStatus.READY,
+            PaymentStatus.PENDING,
+            approveResult.pgTransactionId,
+            approveResult.webhookSecret,
+        )
+        if (updated == 0) {
+            throw IllegalStateException("payment attempt is no longer ready: ${paymentAttempt.id}")
+        }
 
         return ApprovePaymentAttemptResponse(
             paymentAttemptId = paymentAttempt.id,
-            status = paymentAttempt.status,
-            pgTransactionId = pgTransactionId,
+            status = PaymentStatus.PENDING,
+            pgTransactionId = approveResult.pgTransactionId,
         )
     }
 
@@ -94,16 +107,24 @@ class PaymentApplicationService(
 
         val result = pgClient.query(paymentAttempt.pgTransactionId ?: throw IllegalStateException("pgTransactionId is missing"))
 
-        paymentAttempt.status = if (result == "SUCCESS") {
+        val nextStatus = if (result == "SUCCESS") {
             PaymentStatus.DONE
         } else {
             PaymentStatus.FAILED
         }
-        paymentAttemptRepository.save(paymentAttempt)
+
+        val updated = paymentAttemptRepository.updateStatusIfCurrentStatus(
+            paymentAttempt.id,
+            PaymentStatus.PENDING,
+            nextStatus,
+        )
+        if (updated == 0) {
+            throw IllegalStateException("payment attempt is no longer pending: ${paymentAttempt.id}")
+        }
 
         return ReconcilePaymentAttemptResponse(
             paymentAttemptId = paymentAttempt.id,
-            status = paymentAttempt.status,
+            status = nextStatus,
         )
     }
 }
