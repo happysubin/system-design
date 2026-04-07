@@ -18,11 +18,11 @@ class PendingPaymentReconciliationSchedulerTest {
     lateinit var paymentAttemptRepository: PaymentAttemptRepository
 
     @Mock
-    lateinit var paymentApplicationService: PaymentApplicationService
+    lateinit var paymentFacade: PaymentFacade
 
     @Test
     fun `pending 결제 시도만 재확정 대상으로 호출한다`() {
-        val scheduler = PendingPaymentReconciliationScheduler(paymentAttemptRepository, paymentApplicationService)
+        val scheduler = PendingPaymentReconciliationScheduler(paymentAttemptRepository, paymentFacade)
         given(paymentAttemptRepository.findAllByStatus(PaymentStatus.PENDING)).willReturn(
             listOf(
                 PaymentAttempt(id = 1, orderId = 1, merchantOrderId = "order-1", checkoutKey = "checkout-1", amount = 1000, status = PaymentStatus.PENDING),
@@ -32,17 +32,17 @@ class PendingPaymentReconciliationSchedulerTest {
 
         scheduler.reconcilePendingPayments()
 
-        verify(paymentApplicationService).reconcilePaymentAttempt(1)
-        verify(paymentApplicationService).reconcilePaymentAttempt(2)
+        verify(paymentFacade).reconcilePaymentAttempt(1)
+        verify(paymentFacade).reconcilePaymentAttempt(2)
     }
 
     @Test
     fun `pending 결제가 없으면 재확정을 호출하지 않는다`() {
-        val scheduler = PendingPaymentReconciliationScheduler(paymentAttemptRepository, paymentApplicationService)
+        val scheduler = PendingPaymentReconciliationScheduler(paymentAttemptRepository, paymentFacade)
         given(paymentAttemptRepository.findAllByStatus(PaymentStatus.PENDING)).willReturn(emptyList())
 
         scheduler.reconcilePendingPayments()
 
-        verify(paymentApplicationService, never()).reconcilePaymentAttempt(org.mockito.ArgumentMatchers.anyLong())
+        verify(paymentFacade, never()).reconcilePaymentAttempt(org.mockito.ArgumentMatchers.anyLong())
     }
 }
