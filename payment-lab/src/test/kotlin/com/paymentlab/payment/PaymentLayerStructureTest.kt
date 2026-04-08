@@ -1,6 +1,8 @@
 package com.paymentlab.payment
 
-import org.junit.jupiter.api.Assertions.assertNotNull
+import com.paymentlab.payment.domain.PaymentStatus
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
 class PaymentLayerStructureTest {
@@ -17,5 +19,16 @@ class PaymentLayerStructureTest {
         assertNotNull(Class.forName("com.paymentlab.payment.infrastructure.persistence.OrderRepository"))
         assertNotNull(Class.forName("com.paymentlab.payment.infrastructure.persistence.PaymentAttemptRepository"))
         assertNotNull(Class.forName("com.paymentlab.payment.infrastructure.pg.PgClient"))
+    }
+
+    @Test
+    fun `PaymentStatus는 결제 플로우에서 실제 사용되는 상태만 포함한다`() {
+        val statusNames = PaymentStatus.entries.map { it.name }.toSet()
+        val usedStatuses = setOf("READY", "PENDING", "DECLINED", "DONE", "FAILED", "CANCELLED")
+
+        assertTrue(
+            statusNames == usedStatuses,
+            "PaymentStatus should only contain statuses actually used by payment flow. Expected $usedStatuses but got $statusNames"
+        )
     }
 }
