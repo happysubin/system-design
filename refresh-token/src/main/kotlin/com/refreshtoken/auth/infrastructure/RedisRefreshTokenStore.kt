@@ -1,7 +1,6 @@
 package com.refreshtoken.auth.infrastructure
 
 import com.refreshtoken.auth.domain.RefreshTokenStore
-import com.refreshtoken.auth.domain.RefreshTokenStoreUnavailableException
 import java.time.Duration
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Repository
@@ -12,26 +11,14 @@ class RedisRefreshTokenStore(
     private val redisKeyNamespace: RedisKeyNamespace,
 ) : RefreshTokenStore {
     override fun save(refreshToken: String, subject: String, ttl: Duration) {
-        try {
-            redisTemplate.opsForValue().set(key(refreshToken), subject, ttl)
-        } catch (_: RuntimeException) {
-            throw RefreshTokenStoreUnavailableException()
-        }
+        redisTemplate.opsForValue().set(key(refreshToken), subject, ttl)
     }
 
     override fun exists(refreshToken: String): Boolean =
-        try {
-            redisTemplate.hasKey(key(refreshToken)) == true
-        } catch (_: RuntimeException) {
-            throw RefreshTokenStoreUnavailableException()
-        }
+        redisTemplate.hasKey(key(refreshToken)) == true
 
     override fun delete(refreshToken: String) {
-        try {
-            redisTemplate.delete(key(refreshToken))
-        } catch (_: RuntimeException) {
-            throw RefreshTokenStoreUnavailableException()
-        }
+        redisTemplate.delete(key(refreshToken))
     }
 
     private fun key(refreshToken: String): String = redisKeyNamespace.refreshTokenKey(refreshToken)

@@ -10,7 +10,9 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.junit.jupiter.Container
@@ -28,6 +30,28 @@ class AuthIntegrationTest(
     @Autowired private val redisTemplate: StringRedisTemplate,
     @Autowired private val redisKeyNamespace: RedisKeyNamespace,
 ) {
+
+    @Test
+    fun `actuator health exposes redis dependency status`() {
+        mockMvc.perform(get("/actuator/health"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("UP"))
+            .andExpect(jsonPath("$.components.redis.status").value("UP"))
+    }
+
+    @Test
+    fun `actuator metrics exposes redis auth metric after login`() {
+        mockMvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(LoginRequest("demo", "password"))),
+        )
+            .andExpect(status().isOk)
+
+        mockMvc.perform(get("/actuator/metrics"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.names[?(@ == 'auth.redis.operations')]").exists())
+    }
 
     @Test
     fun `login refresh logout and refresh failure flow works with redis`() {
