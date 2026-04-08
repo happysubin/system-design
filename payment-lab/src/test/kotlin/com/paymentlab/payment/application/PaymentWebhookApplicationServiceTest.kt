@@ -20,6 +20,9 @@ class PaymentWebhookApplicationServiceTest {
     @Mock
     lateinit var paymentAttemptRepository: PaymentAttemptRepository
 
+    @Mock
+    lateinit var paymentFinalizationService: PaymentFinalizationService
+
     @Test
     fun `성공 웹훅이 오면 pending 결제 시도를 done으로 확정한다`() {
         val paymentAttempt = PaymentAttempt(
@@ -32,7 +35,7 @@ class PaymentWebhookApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.PENDING,
         )
-        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository, paymentFinalizationService)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
         doReturn(1).`when`(paymentAttemptRepository)
@@ -49,6 +52,7 @@ class PaymentWebhookApplicationServiceTest {
 
         assertEquals(10, result.paymentAttemptId)
         assertEquals(PaymentStatus.DONE, result.status)
+        verify(paymentFinalizationService).finalizeInventoryHold(paymentAttempt, PaymentStatus.DONE)
     }
 
     @Test
@@ -63,7 +67,7 @@ class PaymentWebhookApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.PENDING,
         )
-        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository, paymentFinalizationService)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
         doReturn(1).`when`(paymentAttemptRepository)
@@ -79,6 +83,7 @@ class PaymentWebhookApplicationServiceTest {
         )
 
         assertEquals(PaymentStatus.FAILED, result.status)
+        verify(paymentFinalizationService).finalizeInventoryHold(paymentAttempt, PaymentStatus.FAILED)
     }
 
     @Test
@@ -93,7 +98,7 @@ class PaymentWebhookApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.DONE,
         )
-        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository, paymentFinalizationService)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
 
@@ -109,6 +114,7 @@ class PaymentWebhookApplicationServiceTest {
         assertEquals(PaymentStatus.DONE, result.status)
         assertEquals(PaymentStatus.DONE, paymentAttempt.status)
         verify(paymentAttemptRepository, never()).save(paymentAttempt)
+        verify(paymentFinalizationService, never()).finalizeInventoryHold(paymentAttempt, PaymentStatus.DONE)
     }
 
     @Test
@@ -123,7 +129,7 @@ class PaymentWebhookApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.FAILED,
         )
-        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository, paymentFinalizationService)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
 
@@ -139,6 +145,7 @@ class PaymentWebhookApplicationServiceTest {
         assertEquals(PaymentStatus.FAILED, result.status)
         assertEquals(PaymentStatus.FAILED, paymentAttempt.status)
         verify(paymentAttemptRepository, never()).save(paymentAttempt)
+        verify(paymentFinalizationService, never()).finalizeInventoryHold(paymentAttempt, PaymentStatus.FAILED)
     }
 
     @Test
@@ -153,7 +160,7 @@ class PaymentWebhookApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.READY,
         )
-        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository, paymentFinalizationService)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
 
@@ -169,6 +176,7 @@ class PaymentWebhookApplicationServiceTest {
         }
 
         verify(paymentAttemptRepository, never()).save(paymentAttempt)
+        verify(paymentFinalizationService, never()).finalizeInventoryHold(paymentAttempt, PaymentStatus.DONE)
     }
 
     @Test
@@ -183,7 +191,7 @@ class PaymentWebhookApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.CANCELLED,
         )
-        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository, paymentFinalizationService)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
 
@@ -199,6 +207,7 @@ class PaymentWebhookApplicationServiceTest {
         assertEquals(PaymentStatus.CANCELLED, result.status)
         assertEquals(PaymentStatus.CANCELLED, paymentAttempt.status)
         verify(paymentAttemptRepository, never()).save(paymentAttempt)
+        verify(paymentFinalizationService, never()).finalizeInventoryHold(paymentAttempt, PaymentStatus.CANCELLED)
     }
 
     @Test
@@ -213,7 +222,7 @@ class PaymentWebhookApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.PENDING,
         )
-        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository, paymentFinalizationService)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
         doReturn(0).`when`(paymentAttemptRepository)
@@ -229,6 +238,8 @@ class PaymentWebhookApplicationServiceTest {
                 ),
             )
         }
+
+        verify(paymentFinalizationService, never()).finalizeInventoryHold(paymentAttempt, PaymentStatus.DONE)
     }
 
     @Test
@@ -243,7 +254,7 @@ class PaymentWebhookApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.PENDING,
         )
-        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository, paymentFinalizationService)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
 
@@ -271,7 +282,7 @@ class PaymentWebhookApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.PENDING,
         )
-        val service = PaymentWebhookApplicationService(paymentAttemptRepository)
+        val service = PaymentWebhookApplicationService(paymentAttemptRepository, paymentFinalizationService)
 
         given(paymentAttemptRepository.findByPgTransactionId("pg-tx-1")).willReturn(paymentAttempt)
 

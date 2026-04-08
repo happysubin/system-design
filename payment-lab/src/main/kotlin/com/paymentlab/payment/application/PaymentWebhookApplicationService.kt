@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional
  */
 class PaymentWebhookApplicationService(
     private val paymentAttemptRepository: PaymentAttemptRepository,
+    private val paymentFinalizationService: PaymentFinalizationService,
 ) {
 
     @Transactional
@@ -59,6 +60,8 @@ class PaymentWebhookApplicationService(
         if (updated == 0) {
             throw IllegalStateException("payment attempt is no longer pending for pgTransactionId: ${request.pgTransactionId}")
         }
+
+        paymentFinalizationService.finalizeInventoryHold(paymentAttempt, nextStatus)
 
         return PaymentWebhookResponse(
             paymentAttemptId = paymentAttempt.id,
