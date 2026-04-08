@@ -17,6 +17,16 @@
 
 또한 Redis 장애 시에는 **degraded mode** 로 동작합니다. 이 경우 로그인은 access token만 발급하여 허용하고, refresh token 재발급은 실패 처리하여 다시 로그인하도록 유도합니다.
 
+현재 시스템은 여기에 더해 **resilience hardening 1차**를 적용했습니다. Redis 요청이 오래 매달리지 않도록 짧은 timeout을 두고, Actuator health와 기본 메트릭으로 Redis 상태와 인증 경로의 Redis 사용을 관찰할 수 있도록 구성했습니다.
+
+또한 **resilience hardening 2차**로 Redis refresh-token 저장소에 annotation 기반 circuit breaker를 적용했습니다. Redis 실패가 반복되면 회로를 열고, 이후 요청은 Redis를 계속 두드리지 않고 빠르게 실패하여 기존 degraded mode로 전환됩니다.
+
+현재 구현은 책임을 다음처럼 나눕니다.
+
+- `AuthService`: 로그인 degraded mode, refresh 실패 처리 같은 인증 정책 결정
+- `ResilientRefreshTokenStore`: circuit breaker, metrics, 저장소 장애 변환
+- `RedisRefreshTokenStore`: 순수 Redis 저장/조회/삭제
+
 현재 구현은 별도 회원 DB 없이 **설정 기반 demo 사용자**를 사용합니다.
 
 - username: `demo`
@@ -200,6 +210,10 @@ Client -> Logout API -> 캐시에서 리프레시 토큰 삭제
 - access token은 stateless하게 유지됨
 - refresh token rotation이 적용됨
 - Redis 장애 시 degraded mode 로그인 지원
+- Redis timeout 설정으로 fast-fail 동작 지원
+- Actuator health/metrics로 Redis 상태 확인 가능
+- Redis 연산 메트릭 수집 지원
+- Redis refresh-token 저장소에 circuit breaker 적용
 - 캐시 삭제만으로 로그아웃 처리 가능
 - 캐시 TTL로 만료 관리가 쉬움
 
@@ -208,6 +222,7 @@ Client -> Logout API -> 캐시에서 리프레시 토큰 삭제
 - 캐시가 유실되면 리프레시 세션도 함께 유실됨
 - 캐시 재시작 또는 eviction 이후 사용자가 다시 로그인해야 할 수 있음
 - reuse detection은 아직 없음
+- retry는 아직 적용하지 않은 상태이며, 현재는 timeout + metrics + health + circuit breaker 조합으로 운영함
 - 이 README는 단순한 캐시 기반 세션 모델을 설명하며, 완전한 다중 기기 세션 아키텍처는 다루지 않음
 
 ## 향후 확장 가능 항목
