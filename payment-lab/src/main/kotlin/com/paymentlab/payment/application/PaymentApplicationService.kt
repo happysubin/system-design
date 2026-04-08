@@ -32,6 +32,7 @@ class PaymentApplicationService(
     private val paymentAttemptRepository: PaymentAttemptRepository,
     private val pgClient: PgClient,
     private val checkoutKeyStore: CheckoutKeyStore,
+    private val paymentFinalizationService: PaymentFinalizationService,
 ) {
 
     /**
@@ -43,8 +44,17 @@ class PaymentApplicationService(
      */
     @Transactional
     fun createPaymentAttempt(request: CreatePaymentAttemptRequest): CreatePaymentAttemptResponse {
+        return createPaymentAttempt(request, null)
+    }
+
+    @Transactional
+    fun createPaymentAttempt(request: CreatePaymentAttemptRequest, inventoryHoldId: Long?): CreatePaymentAttemptResponse {
         val existingAttempt = paymentAttemptRepository.findByCheckoutKey(request.checkoutKey)
         if (existingAttempt != null) {
+            if (existingAttempt.inventoryHoldId == null && inventoryHoldId != null) {
+                paymentAttemptRepository.updateInventoryHoldIdIfAbsent(existingAttempt.id, inventoryHoldId)
+            }
+
             return CreatePaymentAttemptResponse(
                 paymentAttemptId = existingAttempt.id,
                 orderId = existingAttempt.orderId,
@@ -68,6 +78,7 @@ class PaymentApplicationService(
                 merchantOrderId = request.merchantOrderId,
                 checkoutKey = request.checkoutKey,
                 amount = request.amount,
+                inventoryHoldId = inventoryHoldId,
                 status = PaymentStatus.READY,
             ),
         )
@@ -181,6 +192,9 @@ class PaymentApplicationService(
      */
     @Transactional
     fun applyReconcileResult(paymentAttemptId: Long, result: String): ReconcilePaymentAttemptResponse {
+        val paymentAttempt = paymentAttemptRepository.findById(paymentAttemptId)
+            .orElseThrow { IllegalArgumentException("payment attempt not found: $paymentAttemptId") }
+
         val nextStatus = if (result == "SUCCESS") {
             PaymentStatus.DONE
         } else {
@@ -195,6 +209,8 @@ class PaymentApplicationService(
         if (updated == 0) {
             throw IllegalStateException("payment attempt is no longer pending: $paymentAttemptId")
         }
+
+        paymentFinalizationService.finalizeInventoryHold(paymentAttempt, nextStatus)
 
         return ReconcilePaymentAttemptResponse(
             paymentAttemptId = paymentAttemptId,

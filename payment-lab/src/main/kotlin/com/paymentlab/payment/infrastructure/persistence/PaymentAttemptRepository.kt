@@ -75,4 +75,18 @@ interface PaymentAttemptRepository : JpaRepository<PaymentAttempt, Long> {
         @Param("currentStatus") currentStatus: PaymentStatus,
         @Param("nextStatus") nextStatus: PaymentStatus,
     ): Int
+
+    @Modifying
+    @Query(
+        """
+        update PaymentAttempt pa
+        set pa.inventoryHoldId = :inventoryHoldId
+        where pa.id = :paymentAttemptId
+          and pa.inventoryHoldId is null
+        """,
+    )
+    fun updateInventoryHoldIdIfAbsent(
+        @Param("paymentAttemptId") paymentAttemptId: Long,
+        @Param("inventoryHoldId") inventoryHoldId: Long,
+    ): Int
 }

@@ -25,8 +25,8 @@ class PendingPaymentReconciliationSchedulerTest {
         val scheduler = PendingPaymentReconciliationScheduler(paymentAttemptRepository, paymentFacade)
         given(paymentAttemptRepository.findAllByStatus(PaymentStatus.PENDING)).willReturn(
             listOf(
-                PaymentAttempt(id = 1, orderId = 1, merchantOrderId = "order-1", checkoutKey = "checkout-1", amount = 1000, status = PaymentStatus.PENDING),
-                PaymentAttempt(id = 2, orderId = 2, merchantOrderId = "order-2", checkoutKey = "checkout-2", amount = 2000, status = PaymentStatus.PENDING),
+                PaymentAttempt(id = 1, orderId = 1, merchantOrderId = "order-1", checkoutKey = "checkout-1", inventoryHoldId = null, amount = 1000, status = PaymentStatus.PENDING),
+                PaymentAttempt(id = 2, orderId = 2, merchantOrderId = "order-2", checkoutKey = "checkout-2", inventoryHoldId = null, amount = 2000, status = PaymentStatus.PENDING),
             ),
         )
 

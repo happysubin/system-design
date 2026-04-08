@@ -31,6 +31,9 @@ class PaymentApprovalApplicationServiceTest {
     @Mock
     lateinit var checkoutKeyStore: CheckoutKeyStore
 
+    @Mock
+    lateinit var paymentFinalizationService: PaymentFinalizationService
+
     @Test
     fun `ready 상태의 결제 시도를 승인 요청하면 pg 호출 후 pending 상태로 바꾼다`() {
         val paymentAttempt = PaymentAttempt(
@@ -41,7 +44,7 @@ class PaymentApprovalApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.READY,
         )
-        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
+        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore, paymentFinalizationService)
 
         given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
         given(pgClient.approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)).willReturn(
@@ -68,7 +71,7 @@ class PaymentApprovalApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.PENDING,
         )
-        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
+        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore, paymentFinalizationService)
 
         given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
 
@@ -89,7 +92,7 @@ class PaymentApprovalApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.READY,
         )
-        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
+        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore, paymentFinalizationService)
 
         given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
         given(pgClient.approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)).willReturn(
@@ -113,7 +116,7 @@ class PaymentApprovalApplicationServiceTest {
             amount = 15000,
             status = PaymentStatus.READY,
         )
-        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore)
+        val service = PaymentApplicationService(paymentAttemptRepository, pgClient, checkoutKeyStore, paymentFinalizationService)
 
         given(paymentAttemptRepository.findById(paymentAttempt.id)).willReturn(Optional.of(paymentAttempt))
         given(pgClient.approve(paymentAttempt.id, paymentAttempt.merchantOrderId, paymentAttempt.amount)).willReturn(

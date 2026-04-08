@@ -27,9 +27,12 @@ class PaymentApplicationServiceTest {
     @Mock
     lateinit var checkoutKeyStore: CheckoutKeyStore
 
+    @Mock
+    lateinit var paymentFinalizationService: PaymentFinalizationService
+
     @Test
     fun `기존 결제 시도가 없으면 외부 주문 정보를 기준으로 결제 시도를 생성한다`() {
-        val paymentApplicationService = PaymentApplicationService(paymentAttemptRepository, StubPgClient(), checkoutKeyStore)
+        val paymentApplicationService = PaymentApplicationService(paymentAttemptRepository, StubPgClient(), checkoutKeyStore, paymentFinalizationService)
 
         given(checkoutKeyStore.consumeIfValid("checkout-1", 1, "order-1", 15000)).willReturn(true)
         given(paymentAttemptRepository.save(org.mockito.ArgumentMatchers.any(PaymentAttempt::class.java))).willAnswer { invocation ->
@@ -62,7 +65,7 @@ class PaymentApplicationServiceTest {
 
     @Test
     fun `같은 checkout key로 다시 요청하면 기존 결제 시도를 재반환한다`() {
-        val paymentApplicationService = PaymentApplicationService(paymentAttemptRepository, StubPgClient(), checkoutKeyStore)
+        val paymentApplicationService = PaymentApplicationService(paymentAttemptRepository, StubPgClient(), checkoutKeyStore, paymentFinalizationService)
         val existingAttempt = PaymentAttempt(
             id = 10,
             orderId = 1,
@@ -107,7 +110,7 @@ class PaymentApplicationServiceTest {
 
     @Test
     fun `유효하지 않은 checkout key면 결제 시도를 생성하지 않는다`() {
-        val paymentApplicationService = PaymentApplicationService(paymentAttemptRepository, StubPgClient(), checkoutKeyStore)
+        val paymentApplicationService = PaymentApplicationService(paymentAttemptRepository, StubPgClient(), checkoutKeyStore, paymentFinalizationService)
 
         given(checkoutKeyStore.consumeIfValid("checkout-1", 1, "order-1", 15000)).willReturn(false)
 

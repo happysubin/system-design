@@ -40,6 +40,9 @@ class PaymentAttempt(
     @Column(name = "webhook_secret", length = 120)
     var webhookSecret: String? = null,
 
+    @Column(name = "inventory_hold_id")
+    var inventoryHoldId: Long? = null,
+
     /**
      * 결제 시작 시점에 확정한 금액 스냅샷이다.
      * 이후 원본 주문 금액이 바뀌더라도 이 결제 시도가 어떤 금액으로 시작됐는지 보존한다.
