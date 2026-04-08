@@ -1,5 +1,6 @@
 package com.paymentlab.payment.application
 
+import com.paymentlab.inventory.application.InventoryHoldApplicationService
 import com.paymentlab.payment.api.dto.ApprovePaymentAttemptResponse
 import com.paymentlab.payment.api.dto.CreatePaymentAttemptRequest
 import com.paymentlab.payment.api.dto.ReconcilePaymentAttemptResponse
@@ -22,10 +23,12 @@ import org.springframework.stereotype.Service
  */
 class PaymentFacade(
     private val paymentApplicationService: PaymentApplicationService,
+    private val inventoryHoldApplicationService: InventoryHoldApplicationService,
     private val pgClient: PgClient,
 ) {
     fun startPayment(request: CreatePaymentAttemptRequest): ApprovePaymentAttemptResponse {
-        val paymentAttempt = paymentApplicationService.createPaymentAttempt(request)
+        val inventoryHold = inventoryHoldApplicationService.reserveOrReuse(request.orderId)
+        val paymentAttempt = paymentApplicationService.createPaymentAttempt(request, inventoryHold.id)
         return try {
             val approveResult = pgClient.approve(
                 paymentAttempt.paymentAttemptId,
