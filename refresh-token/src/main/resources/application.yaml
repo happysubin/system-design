@@ -5,6 +5,18 @@ spring:
     redis:
       host: localhost
       port: 6379
+      timeout: 500ms
+      connect-timeout: 500ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
 
 app:
   auth:
@@ -18,3 +30,15 @@ app:
     demo-user:
       username: demo
       password: password
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      redisRefreshTokenStore:
+        slidingWindowSize: 4
+        minimumNumberOfCalls: 4
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        recordExceptions:
+          - com.refreshtoken.auth.domain.RefreshTokenStoreUnavailableException
+          - java.lang.RuntimeException

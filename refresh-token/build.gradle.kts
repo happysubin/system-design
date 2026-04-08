@@ -20,11 +20,15 @@ repositories {
 }
 
 dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:2.3.0")
     implementation("io.jsonwebtoken:jjwt-api:0.12.7")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.springframework:spring-aop")
     implementation("tools.jackson.module:jackson-module-kotlin")
+    runtimeOnly("org.aspectj:aspectjweaver")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.7")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.7")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
