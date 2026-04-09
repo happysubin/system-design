@@ -1,6 +1,8 @@
 package com.paymentlab.payment.api
 
+import com.paymentlab.payment.api.dto.CreateOrderItemRequest
 import com.paymentlab.payment.api.dto.CreateOrderRequest
+import com.paymentlab.payment.api.dto.CreateOrderResponseItem
 import com.paymentlab.payment.api.dto.CreateOrderResponse
 import com.paymentlab.payment.application.OrderApplicationService
 import org.junit.jupiter.api.Test
@@ -17,12 +19,32 @@ class OrderApiTest {
         val orderApplicationService = mock(OrderApplicationService::class.java)
         val mockMvc = MockMvcBuilders.standaloneSetup(OrderController(orderApplicationService)).build()
 
-        given(orderApplicationService.createOrder(CreateOrderRequest(amount = 15000))).willReturn(
+        given(
+            orderApplicationService.createOrder(
+                CreateOrderRequest(
+                    amount = 15000,
+                    items = listOf(
+                        CreateOrderItemRequest(
+                            skuId = 101L,
+                            quantity = 2,
+                            unitPrice = 7500,
+                        ),
+                    ),
+                ),
+            ),
+        ).willReturn(
             CreateOrderResponse(
                 orderId = 1,
                 merchantOrderId = "generated-order-key",
                 checkoutKey = "checkout-1",
                 amount = 15000,
+                items = listOf(
+                    CreateOrderResponseItem(
+                        skuId = 101L,
+                        quantity = 2,
+                        unitPrice = 7500,
+                    ),
+                ),
             ),
         )
 
@@ -30,7 +52,14 @@ class OrderApiTest {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
-                  "amount": 15000
+                  "amount": 15000,
+                  "items": [
+                    {
+                      "skuId": 101,
+                      "quantity": 2,
+                      "unitPrice": 7500
+                    }
+                  ]
                 }
             """.trimIndent()
         }
@@ -40,6 +69,9 @@ class OrderApiTest {
                 jsonPath("$.merchantOrderId") { value("generated-order-key") }
                 jsonPath("$.checkoutKey") { value("checkout-1") }
                 jsonPath("$.amount") { value(15000) }
+                jsonPath("$.items[0].skuId") { value(101) }
+                jsonPath("$.items[0].quantity") { value(2) }
+                jsonPath("$.items[0].unitPrice") { value(7500) }
             }
     }
 }

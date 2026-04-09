@@ -1,7 +1,9 @@
 package com.paymentlab.payment.application
 
 import com.paymentlab.payment.api.dto.CreateOrderRequest
+import com.paymentlab.payment.api.dto.CreateOrderResponseItem
 import com.paymentlab.payment.api.dto.CreateOrderResponse
+import com.paymentlab.order.domain.OrderItem
 import com.paymentlab.payment.domain.Order
 import com.paymentlab.payment.infrastructure.persistence.OrderRepository
 import com.paymentlab.payment.infrastructure.redis.CheckoutKeyStore
@@ -29,6 +31,13 @@ class OrderApplicationService(
             Order(
                 merchantOrderId = UUID.randomUUID().toString(),
                 amount = request.amount,
+                items = request.items.map {
+                    OrderItem(
+                        skuId = it.skuId,
+                        quantity = it.quantity,
+                        unitPrice = it.unitPrice,
+                    )
+                }.toMutableList(),
             ),
         )
         val checkoutKey = checkoutKeyStore.issue(savedOrder.id, savedOrder.merchantOrderId, savedOrder.amount)
@@ -38,6 +47,13 @@ class OrderApplicationService(
             merchantOrderId = savedOrder.merchantOrderId,
             checkoutKey = checkoutKey,
             amount = savedOrder.amount,
+            items = savedOrder.items.map {
+                CreateOrderResponseItem(
+                    skuId = it.skuId,
+                    quantity = it.quantity,
+                    unitPrice = it.unitPrice,
+                )
+            },
         )
     }
 }

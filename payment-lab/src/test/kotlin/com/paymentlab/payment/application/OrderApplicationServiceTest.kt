@@ -1,5 +1,6 @@
 package com.paymentlab.payment.application
 
+import com.paymentlab.payment.api.dto.CreateOrderItemRequest
 import com.paymentlab.payment.api.dto.CreateOrderRequest
 import com.paymentlab.payment.infrastructure.persistence.OrderRepository
 import com.paymentlab.payment.infrastructure.redis.CheckoutKeyStore
@@ -41,6 +42,13 @@ class OrderApplicationServiceTest {
         val result = service.createOrder(
             CreateOrderRequest(
                 amount = 15000,
+                items = listOf(
+                    CreateOrderItemRequest(
+                        skuId = 101L,
+                        quantity = 2,
+                        unitPrice = 7500,
+                    ),
+                ),
             ),
         )
 
@@ -48,9 +56,17 @@ class OrderApplicationServiceTest {
         verify(orderRepository).save(captor.capture())
         assertNotNull(captor.value.merchantOrderId)
         assertTrue(captor.value.merchantOrderId.isNotBlank())
+        assertEquals(1, captor.value.items.size)
+        assertEquals(101L, captor.value.items[0].skuId)
+        assertEquals(2, captor.value.items[0].quantity)
+        assertEquals(7500, captor.value.items[0].unitPrice)
         assertEquals(1, result.orderId)
         assertEquals(captor.value.merchantOrderId, result.merchantOrderId)
         assertEquals("checkout-1", result.checkoutKey)
         assertEquals(15000, result.amount)
+        assertEquals(1, result.items.size)
+        assertEquals(101L, result.items[0].skuId)
+        assertEquals(2, result.items[0].quantity)
+        assertEquals(7500, result.items[0].unitPrice)
     }
 }
