@@ -29,6 +29,8 @@ class OrderApplicationService(
     fun createOrder(request: CreateOrderRequest): CreateOrderResponse {
         val savedOrder = orderRepository.save(
             Order(
+                // merchantOrderId는 외부 주문 시스템이 있다고 가정하면 원래 바깥에서 들어와야 하지만,
+                // 현재는 로컬 보조 API이므로 테스트 흐름을 닫기 위해 서버가 임시 발급한다.
                 merchantOrderId = UUID.randomUUID().toString(),
                 amount = request.amount,
                 items = request.items.map {
@@ -38,8 +40,11 @@ class OrderApplicationService(
                         unitPrice = it.unitPrice,
                     )
                 }.toMutableList(),
-            ),
+                ),
         )
+
+        // checkoutKey는 주문이 실제로 저장된 뒤에 발급해야 orderId/merchantOrderId/amount를
+        // Redis payload에 함께 묶을 수 있고, 이후 결제 시작 시 동일성 검증 기준으로 쓸 수 있다.
         val checkoutKey = checkoutKeyStore.issue(savedOrder.id, savedOrder.merchantOrderId, savedOrder.amount)
 
         return CreateOrderResponse(

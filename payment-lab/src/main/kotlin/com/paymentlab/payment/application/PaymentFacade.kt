@@ -25,8 +25,10 @@ class PaymentFacade(
     private val paymentApplicationService: PaymentApplicationService,
     private val inventoryHoldApplicationService: InventoryHoldApplicationService,
     private val pgClient: PgClient,
-) {
+    ) {
     fun startPayment(request: CreatePaymentAttemptRequest): ApprovePaymentAttemptResponse {
+        // PG 승인 전에 hold를 먼저 확보하는 이유는,
+        // 결제 성공 가능성이 있는 요청만 재고를 선점하고 이후 성공/실패에 따라 한 경로로 정산하기 위해서다.
         val inventoryHold = inventoryHoldApplicationService.reserveOrReuse(request.orderId)
         val paymentAttempt = paymentApplicationService.createPaymentAttempt(request, inventoryHold.id)
         return try {
@@ -37,6 +39,8 @@ class PaymentFacade(
             )
             paymentApplicationService.applyApproveResult(paymentAttempt.paymentAttemptId, approveResult)
         } catch (exception: RuntimeException) {
+            // 동기 승인 호출이 실패해도 PG 쪽 결과가 완전히 불명확할 수 있으므로,
+            // 즉시 FAILED로 닫지 않고 PENDING으로 남겨 webhook/reconcile이 정리하게 한다.
             paymentApplicationService.markPendingForUnknownApproveResult(paymentAttempt.paymentAttemptId)
             throw exception
         }

@@ -52,6 +52,8 @@ class PaymentApplicationService(
         val existingAttempt = paymentAttemptRepository.findByCheckoutKey(request.checkoutKey)
         if (existingAttempt != null) {
             if (existingAttempt.inventoryHoldId == null && inventoryHoldId != null) {
+                // 과거 시도 레코드가 먼저 생기고 hold 연결이 비어 있을 수 있어서,
+                // 중복 시도에서는 새 attempt를 만들지 않고 linked hold만 backfill한다.
                 paymentAttemptRepository.updateInventoryHoldIdIfAbsent(existingAttempt.id, inventoryHoldId)
             }
 
@@ -72,6 +74,8 @@ class PaymentApplicationService(
             throw IllegalArgumentException("invalid checkout key: ${request.checkoutKey}")
         }
 
+        // checkoutKey를 소비한 뒤 READY attempt를 먼저 남기는 이유는,
+        // 이후 외부 PG 호출이 실패하거나 지연돼도 '결제 시작 시도' 자체는 DB에 추적 가능하게 두기 위해서다.
         val savedAttempt = paymentAttemptRepository.save(
             PaymentAttempt(
                 orderId = request.orderId,
@@ -210,6 +214,8 @@ class PaymentApplicationService(
             throw IllegalStateException("payment attempt is no longer pending: $paymentAttemptId")
         }
 
+        // 웹훅과 재확정은 같은 결제를 두 경로에서 동시에 정리할 수 있으므로,
+        // inventory 후속 정리는 PENDING 상태 전이를 실제로 이긴 경우에만 수행되어야 한다.
         paymentFinalizationService.finalizeInventoryHold(paymentAttempt, nextStatus)
 
         return ReconcilePaymentAttemptResponse(

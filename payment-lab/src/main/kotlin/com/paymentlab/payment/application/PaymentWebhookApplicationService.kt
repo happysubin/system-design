@@ -36,6 +36,8 @@ class PaymentWebhookApplicationService(
         }
 
         if (paymentAttempt.status == PaymentStatus.DONE || paymentAttempt.status == PaymentStatus.FAILED || paymentAttempt.status == PaymentStatus.CANCELLED) {
+            // 이미 끝난 결제는 같은 웹훅이 다시 와도 그대로 돌려보내서,
+            // 중복 콜백이 inventory finalization을 다시 타지 않게 한다.
             return PaymentWebhookResponse(
                 paymentAttemptId = paymentAttempt.id,
                 status = paymentAttempt.status,
@@ -61,6 +63,8 @@ class PaymentWebhookApplicationService(
             throw IllegalStateException("payment attempt is no longer pending for pgTransactionId: ${request.pgTransactionId}")
         }
 
+        // payment 상태 전이를 먼저 이긴 뒤에만 inventory를 정리해야,
+        // webhook/reconcile 경쟁 상황에서도 hold confirm/release가 한 번만 수행된다.
         paymentFinalizationService.finalizeInventoryHold(paymentAttempt, nextStatus)
 
         return PaymentWebhookResponse(
