@@ -13,10 +13,10 @@ class PaymentLayerStructureTest {
         assertNotNull(Class.forName("com.paymentlab.payment.api.WebhookController"))
         assertNotNull(Class.forName("com.paymentlab.payment.application.PaymentApplicationService"))
         assertNotNull(Class.forName("com.paymentlab.payment.application.PaymentWebhookApplicationService"))
-        assertNotNull(Class.forName("com.paymentlab.payment.domain.Order"))
+        assertNotNull(Class.forName("com.paymentlab.order.domain.Order"))
         assertNotNull(Class.forName("com.paymentlab.payment.domain.PaymentAttempt"))
         assertNotNull(Class.forName("com.paymentlab.payment.domain.PaymentStatus"))
-        assertNotNull(Class.forName("com.paymentlab.payment.infrastructure.persistence.OrderRepository"))
+        assertNotNull(Class.forName("com.paymentlab.order.infrastructure.persistence.OrderRepository"))
         assertNotNull(Class.forName("com.paymentlab.payment.infrastructure.persistence.PaymentAttemptRepository"))
         assertNotNull(Class.forName("com.paymentlab.payment.infrastructure.pg.PgClient"))
     }
