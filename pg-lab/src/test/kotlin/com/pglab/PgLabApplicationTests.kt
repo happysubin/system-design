@@ -7,7 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest
 class PgLabApplicationTests {
 
     @Test
-    fun contextLoads() {
+    fun `애플리케이션 컨텍스트가 로드된다`() {
     }
 
 }
