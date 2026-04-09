@@ -1,7 +1,6 @@
 package com.paymentlab.payment.application
 
-import com.paymentlab.inventory.domain.InventoryHoldStatus
-import com.paymentlab.inventory.infrastructure.persistence.InventoryHoldRepository
+import com.paymentlab.inventory.application.InventoryHoldApplicationService
 import com.paymentlab.payment.domain.PaymentAttempt
 import com.paymentlab.payment.domain.PaymentStatus
 import org.springframework.stereotype.Service
@@ -9,35 +8,40 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class PaymentFinalizationService(
-    private val inventoryHoldRepository: InventoryHoldRepository,
+    private val inventoryHoldApplicationService: InventoryHoldApplicationService,
 ) {
     @Transactional
     fun finalizeInventoryHold(paymentAttempt: PaymentAttempt, paymentStatus: PaymentStatus) {
-        val nextInventoryStatus = when (paymentStatus) {
-            PaymentStatus.DONE -> InventoryHoldStatus.CONFIRMED
-            PaymentStatus.FAILED, PaymentStatus.CANCELLED -> InventoryHoldStatus.RELEASED
+        when (paymentStatus) {
+            PaymentStatus.DONE -> {
+                confirmLinkedHold(paymentAttempt)
+                return
+            }
+            PaymentStatus.FAILED, PaymentStatus.CANCELLED -> {
+                releaseLinkedHold(paymentAttempt)
+                return
+            }
             else -> return
         }
+    }
 
+    private fun confirmLinkedHold(paymentAttempt: PaymentAttempt) {
         val inventoryHoldId = paymentAttempt.inventoryHoldId
             ?: throw IllegalStateException("inventory hold is not linked for paymentAttemptId: ${paymentAttempt.id}")
 
-        val hold = inventoryHoldRepository.findById(inventoryHoldId)
-            .orElseThrow { IllegalStateException("inventory hold not found: $inventoryHoldId") }
-
-        if (hold.orderId != paymentAttempt.orderId) {
-            throw IllegalStateException(
-                "inventory hold $inventoryHoldId does not belong to orderId: ${paymentAttempt.orderId}",
-            )
-        }
-
-        val updated = inventoryHoldRepository.updateStatusIfCurrentStatus(
-            inventoryHoldId,
-            InventoryHoldStatus.HELD,
-            nextInventoryStatus,
+        inventoryHoldApplicationService.confirmHeldHold(
+            orderId = paymentAttempt.orderId,
+            inventoryHoldId = inventoryHoldId,
         )
-        if (updated == 0) {
-            throw IllegalStateException("inventory hold is no longer held: $inventoryHoldId")
-        }
+    }
+
+    private fun releaseLinkedHold(paymentAttempt: PaymentAttempt) {
+        val inventoryHoldId = paymentAttempt.inventoryHoldId
+            ?: throw IllegalStateException("inventory hold is not linked for paymentAttemptId: ${paymentAttempt.id}")
+
+        inventoryHoldApplicationService.releaseHeldHold(
+            orderId = paymentAttempt.orderId,
+            inventoryHoldId = inventoryHoldId,
+        )
     }
 }

@@ -1,8 +1,12 @@
 package com.paymentlab.payment.application
 
 import com.paymentlab.inventory.domain.InventoryHold
+import com.paymentlab.inventory.domain.InventoryHoldItem
 import com.paymentlab.inventory.domain.InventoryHoldStatus
 import com.paymentlab.inventory.infrastructure.persistence.InventoryHoldRepository
+import com.paymentlab.inventory.infrastructure.persistence.InventoryHoldItemRepository
+import com.paymentlab.inventory.infrastructure.persistence.SkuStockRepository
+import com.paymentlab.inventory.domain.SkuStock
 import com.paymentlab.payment.api.dto.PaymentWebhookRequest
 import com.paymentlab.payment.domain.PaymentAttempt
 import com.paymentlab.payment.domain.PaymentStatus
@@ -28,13 +32,23 @@ class PaymentWebhookApplicationServiceFinalizationTest {
     lateinit var inventoryHoldRepository: InventoryHoldRepository
 
     @Autowired
+    lateinit var inventoryHoldItemRepository: InventoryHoldItemRepository
+
+    @Autowired
+    lateinit var skuStockRepository: SkuStockRepository
+
+    @Autowired
     lateinit var jdbcTemplate: JdbcTemplate
 
     @BeforeEach
     fun setUp() {
+        inventoryHoldItemRepository.deleteAll()
+        skuStockRepository.deleteAll()
         paymentAttemptRepository.deleteAll()
         inventoryHoldRepository.deleteAll()
         jdbcTemplate.execute("ALTER TABLE payment_attempts ALTER COLUMN id RESTART WITH 1")
+        jdbcTemplate.execute("ALTER TABLE inventory_hold_items ALTER COLUMN id RESTART WITH 1")
+        jdbcTemplate.execute("ALTER TABLE sku_stocks ALTER COLUMN id RESTART WITH 1")
         jdbcTemplate.execute("ALTER TABLE inventory_holds ALTER COLUMN id RESTART WITH 1")
     }
 
@@ -42,6 +56,8 @@ class PaymentWebhookApplicationServiceFinalizationTest {
     fun `성공 웹훅은 연결된 홀드만 확정하고 같은 주문의 다른 홀드는 유지한다`() {
         val linkedHold = inventoryHoldRepository.saveAndFlush(heldHold(orderId = 1, createdAt = LocalDateTime.of(2026, 4, 8, 10, 0, 0)))
         val laterHold = inventoryHoldRepository.saveAndFlush(heldHold(orderId = 1, createdAt = LocalDateTime.of(2026, 4, 8, 10, 5, 0)))
+        inventoryHoldItemRepository.saveAndFlush(InventoryHoldItem(hold = linkedHold, skuId = 101L, quantity = 2))
+        skuStockRepository.saveAndFlush(SkuStock(skuId = 101L, onHand = 10, reserved = 2))
         paymentAttemptRepository.saveAndFlush(
             pendingAttempt(orderId = 1, inventoryHoldId = linkedHold.id),
         )
