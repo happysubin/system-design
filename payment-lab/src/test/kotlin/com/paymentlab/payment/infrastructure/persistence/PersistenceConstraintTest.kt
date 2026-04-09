@@ -1,6 +1,7 @@
 package com.paymentlab.payment.infrastructure.persistence
 
-import com.paymentlab.payment.domain.Order
+import com.paymentlab.order.domain.Order
+import com.paymentlab.order.infrastructure.persistence.OrderRepository
 import com.paymentlab.payment.domain.PaymentAttempt
 import com.paymentlab.payment.domain.PaymentStatus
 import org.junit.jupiter.api.BeforeEach

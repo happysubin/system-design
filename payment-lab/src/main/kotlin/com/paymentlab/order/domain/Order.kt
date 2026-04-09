@@ -1,6 +1,5 @@
-package com.paymentlab.payment.domain
+package com.paymentlab.order.domain
 
-import com.paymentlab.order.domain.OrderItem
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

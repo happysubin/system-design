@@ -1,6 +1,5 @@
 package com.paymentlab.order.domain
 
-import com.paymentlab.payment.domain.Order
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
