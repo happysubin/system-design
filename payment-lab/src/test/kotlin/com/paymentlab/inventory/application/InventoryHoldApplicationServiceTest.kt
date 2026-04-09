@@ -6,11 +6,11 @@ import com.paymentlab.inventory.domain.InventoryHoldStatus
 import com.paymentlab.inventory.domain.SkuStock
 import com.paymentlab.inventory.infrastructure.persistence.InventoryHoldItemRepository
 import com.paymentlab.inventory.infrastructure.persistence.InventoryHoldRepository
+import com.paymentlab.order.domain.Order
 import com.paymentlab.inventory.infrastructure.persistence.SkuStockRepository
 import com.paymentlab.order.domain.OrderItem
+import com.paymentlab.order.infrastructure.persistence.OrderRepository
 import com.paymentlab.order.infrastructure.persistence.OrderItemRepository
-import com.paymentlab.payment.domain.Order
-import com.paymentlab.payment.infrastructure.persistence.OrderRepository
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.BDDMockito.given

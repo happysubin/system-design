@@ -5,10 +5,10 @@ import com.paymentlab.inventory.infrastructure.persistence.InventoryHoldItemRepo
 import com.paymentlab.inventory.domain.SkuStock
 import com.paymentlab.inventory.domain.InventoryHoldStatus
 import com.paymentlab.inventory.infrastructure.persistence.InventoryHoldRepository
+import com.paymentlab.order.domain.Order
 import com.paymentlab.order.domain.OrderItem
+import com.paymentlab.order.infrastructure.persistence.OrderRepository
 import com.paymentlab.order.infrastructure.persistence.OrderItemRepository
-import com.paymentlab.payment.domain.Order
-import com.paymentlab.payment.infrastructure.persistence.OrderRepository
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
