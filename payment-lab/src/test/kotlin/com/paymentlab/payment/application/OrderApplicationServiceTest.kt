@@ -1,8 +1,10 @@
 package com.paymentlab.payment.application
 
-import com.paymentlab.payment.api.dto.CreateOrderItemRequest
-import com.paymentlab.payment.api.dto.CreateOrderRequest
-import com.paymentlab.payment.infrastructure.persistence.OrderRepository
+import com.paymentlab.order.api.dto.CreateOrderItemRequest
+import com.paymentlab.order.api.dto.CreateOrderRequest
+import com.paymentlab.order.domain.Order
+import com.paymentlab.order.application.OrderApplicationService
+import com.paymentlab.order.infrastructure.persistence.OrderRepository
 import com.paymentlab.payment.infrastructure.redis.CheckoutKeyStore
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -15,7 +17,6 @@ import org.mockito.junit.jupiter.MockitoExtension
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import com.paymentlab.payment.domain.Order
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.eq
 

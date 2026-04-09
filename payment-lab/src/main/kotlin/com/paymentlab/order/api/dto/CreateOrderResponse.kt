@@ -1,4 +1,4 @@
-package com.paymentlab.payment.api.dto
+package com.paymentlab.order.api.dto
 
 /**
  * 주문 생성 응답이다.

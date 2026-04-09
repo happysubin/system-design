@@ -1,11 +1,11 @@
-package com.paymentlab.payment.application
+package com.paymentlab.order.application
 
-import com.paymentlab.payment.api.dto.CreateOrderRequest
-import com.paymentlab.payment.api.dto.CreateOrderResponseItem
-import com.paymentlab.payment.api.dto.CreateOrderResponse
+import com.paymentlab.order.api.dto.CreateOrderRequest
+import com.paymentlab.order.api.dto.CreateOrderResponse
+import com.paymentlab.order.api.dto.CreateOrderResponseItem
+import com.paymentlab.order.domain.Order
 import com.paymentlab.order.domain.OrderItem
-import com.paymentlab.payment.domain.Order
-import com.paymentlab.payment.infrastructure.persistence.OrderRepository
+import com.paymentlab.order.infrastructure.persistence.OrderRepository
 import com.paymentlab.payment.infrastructure.redis.CheckoutKeyStore
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
