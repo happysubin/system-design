@@ -22,6 +22,7 @@ class PaymentJpaMappingTest(
     @Test
     fun `결제 도메인 엔티티는 JPA로 저장할 수 있다`() {
         val order = PaymentOrder(
+            merchantId = "merchant-1",
             merchantOrderId = "order-100",
             totalAmount = Money(50_000L, CurrencyCode.KRW),
         )

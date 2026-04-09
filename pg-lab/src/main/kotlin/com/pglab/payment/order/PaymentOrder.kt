@@ -36,6 +36,14 @@ class PaymentOrder(
      * 외부 시스템 식별자 규칙이 바뀌어도 영속성 식별 체계가 흔들리지 않게 한다.
      */
     val id: Long? = null,
+    @Column(nullable = false)
+    /**
+     * 이 결제 주문의 소유 가맹점 식별자다.
+     *
+     * 정산은 가맹점 지급 관점으로 집계되므로,
+     * 주문 단계에서부터 merchant 축을 명시해야 이후 ledger 집계와 settlement 생성이 가능해진다.
+     */
+    val merchantId: String = "",
     @Column(nullable = false, unique = true)
     /**
      * 가맹점 또는 외부 주문 시스템이 들고 있는 결제 주문 식별자다.
