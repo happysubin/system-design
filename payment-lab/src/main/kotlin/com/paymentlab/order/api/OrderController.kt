@@ -1,8 +1,8 @@
-package com.paymentlab.payment.api
+package com.paymentlab.order.api
 
-import com.paymentlab.payment.api.dto.CreateOrderRequest
-import com.paymentlab.payment.api.dto.CreateOrderResponse
-import com.paymentlab.payment.application.OrderApplicationService
+import com.paymentlab.order.api.dto.CreateOrderRequest
+import com.paymentlab.order.api.dto.CreateOrderResponse
+import com.paymentlab.order.application.OrderApplicationService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody

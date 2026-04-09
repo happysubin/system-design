@@ -1,10 +1,11 @@
 package com.paymentlab.payment.api
 
-import com.paymentlab.payment.api.dto.CreateOrderItemRequest
-import com.paymentlab.payment.api.dto.CreateOrderRequest
-import com.paymentlab.payment.api.dto.CreateOrderResponseItem
-import com.paymentlab.payment.api.dto.CreateOrderResponse
-import com.paymentlab.payment.application.OrderApplicationService
+import com.paymentlab.order.api.OrderController
+import com.paymentlab.order.api.dto.CreateOrderItemRequest
+import com.paymentlab.order.api.dto.CreateOrderRequest
+import com.paymentlab.order.api.dto.CreateOrderResponse
+import com.paymentlab.order.api.dto.CreateOrderResponseItem
+import com.paymentlab.order.application.OrderApplicationService
 import org.junit.jupiter.api.Test
 import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
