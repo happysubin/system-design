@@ -14,7 +14,8 @@ class RefundServiceTest {
     @Test
     fun `부분 환불 시 환불 가능 잔액이 줄고 환불 원장이 생성된다`() {
         val context = mixedAuthorizedContext()
-        val service = RefundService()
+        val writer = FakeRefundWriter()
+        val service = RefundService(writer)
 
         val result = service.refund(
             RefundCommand(
@@ -31,12 +32,13 @@ class RefundServiceTest {
         assertEquals(5_000L, result.ledgerEntry.amount.amount)
         assertEquals(PaymentAllocationStatus.PARTIALLY_CANCELED, result.allocation.status)
         assertEquals(PaymentOrderStatus.PARTIALLY_CANCELED, result.order.status)
+        assertEquals(1, writer.savedResults.size)
     }
 
     @Test
     fun `allocation 전체가 환불되면 주문과 부담단위는 취소 완료 상태가 된다`() {
         val context = mixedAuthorizedContext()
-        val service = RefundService()
+        val service = RefundService(FakeRefundWriter())
 
         service.refund(
             RefundCommand(
@@ -99,4 +101,13 @@ class RefundServiceTest {
         val allocation: PaymentAllocation,
         val authorizations: List<Authorization>,
     )
+
+    private class FakeRefundWriter : RefundWriter {
+        val savedResults = mutableListOf<RefundResult>()
+
+        override fun save(result: RefundResult): RefundResult {
+            savedResults.add(result)
+            return result
+        }
+    }
 }

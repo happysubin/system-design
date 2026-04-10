@@ -7,8 +7,14 @@ import com.pglab.payment.ledger.LedgerEntryType
 import com.pglab.payment.order.PaymentOrder
 import com.pglab.payment.order.PaymentOrderStatus
 import com.pglab.payment.shared.Money
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
-class RefundService {
+@Service
+class RefundService(
+    private val writer: RefundWriter,
+) {
+    @Transactional
     fun refund(command: RefundCommand): RefundResult {
         // 환불은 취소와 비슷해 보이지만 "남은 환불 가능 금액"을 기준으로 판단한다.
         // 따라서 먼저 authorization 단위 잔액을 줄여서 환불 가능 범위를 확정한다.
@@ -38,12 +44,14 @@ class RefundService {
         }
 
         // 결과 객체는 환불 후 달라진 authorization과 원장, 상위 상태를 한 번에 묶어준다.
-        return RefundResult(
+        val result = RefundResult(
             order = command.order,
             allocation = command.allocation,
             authorization = command.authorization,
             ledgerEntry = ledgerEntry,
         )
+
+        return writer.save(result)
     }
 
     private fun refundAuthorization(authorization: Authorization, refundAmount: Money) {
@@ -62,6 +70,10 @@ class RefundService {
             authorization.remainingRefundableAmount.currency,
         )
     }
+}
+
+interface RefundWriter {
+    fun save(result: RefundResult): RefundResult
 }
 
 data class RefundCommand(
