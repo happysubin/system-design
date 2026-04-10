@@ -137,13 +137,14 @@
 
 ### 3.5 Settlement
 
-정산 배치 또는 정산 지급 단위를 표현하는 엔티티다.
+정산 계산 결과를 표현하는 엔티티다.
 
 주요 책임:
 
 - 원장 엔트리 여러 개를 정산 관점으로 묶음
 - 정산 대상 기간과 상태 표현
-- 실제 지급 예정/완료 금액 관리
+- 가맹점에게 지급해야 할 총액/수수료/순액 계산 결과 보관
+- 실제 송금 실행을 위한 상위 지급 단위 제공
 
 예상 필드:
 
@@ -156,6 +157,38 @@
 - `feeAmount`
 - `netAmount`
 
+### 3.6 Payout
+
+실제 송금 시도와 결과를 표현하는 엔티티다.
+
+`Settlement`가 "얼마를 지급해야 하는가"를 계산한 결과라면,
+`Payout`은 "그 돈을 실제로 어떻게 송금했고 결과가 어땠는가"를 기록한다.
+
+주요 책임:
+
+- 특정 Settlement에 대한 실제 송금 시도 기록
+- 은행/원천사 응답과 송금 요청 식별자 보관
+- 실패 사유와 재시도 이력 관리
+- 지급 성공/실패를 Settlement 상태와 연결
+
+예상 필드:
+
+- `id`
+- `settlementId`
+- `payoutStatus`
+- `requestedAmount`
+- `bankCode`
+- `bankAccountNumber`
+- `accountHolderName`
+- `bankTransferRequestId`
+- `bankTransferTransactionId`
+- `requestedAt`
+- `sentAt`
+- `completedAt`
+- `failureCode`
+- `failureReason`
+- `retryCount`
+
 ## 4. 연관관계
 
 권장 관계는 다음과 같다.
@@ -166,9 +199,13 @@
 - `PaymentAllocation 1:N LedgerEntry`
 - `Authorization 1:N LedgerEntry`
 - `Settlement 1:N LedgerEntry` 또는 `Settlement 1:N SettlementLine`
+- `Settlement 1:N Payout`
 
 핵심 포인트는 `PaymentAllocation`과 `Authorization`을 1:1로 고정하지 않는 것이다.
 그래야 한 부담분이 여러 승인 시도로 이어지거나, 한 사람의 부담분이 카드와 계좌로 다시 분할되는 경우를 표현할 수 있다.
+
+또한 `Settlement`와 `Payout`을 분리해야,
+정산 금액 계산 결과와 실제 송금 실행 결과가 서로의 책임을 침범하지 않는다.
 
 ## 5. 주요 시나리오별 해석
 
@@ -216,6 +253,8 @@
 4. `LedgerEntry`는 수정/삭제 대신 추가로만 상태를 반영해야 한다.
 5. 운영 조회용 잔액 필드는 원장과 모순되면 안 된다.
 6. 정산 금액은 원장 엔트리의 집계 결과로 계산되어야 한다.
+7. `Payout`은 `Settlement`가 준비된 이후에만 생성되어야 한다.
+8. 하나의 `Settlement`는 여러 차례의 `Payout` 시도를 가질 수 있어야 한다.
 
 ## 7. JPA 설계 가이드
 
@@ -241,6 +280,7 @@
 - `InstrumentType`
 - `LedgerEntryType`
 - `SettlementStatus`
+- `PayoutStatus`
 
 ## 8. 주석 작성 원칙
 
@@ -259,7 +299,7 @@
 
 이번 설계 범위:
 
-- 결제/승인/원장/정산의 엔티티 경계 수립
+- 결제/승인/원장/정산/지급의 엔티티 경계 수립
 - 부분 취소, 더치페이, 복합 결제 대응 구조 정의
 - JPA 엔티티 설계의 기반 마련
 
@@ -279,7 +319,8 @@
 - 부담 분배: `PaymentAllocation`
 - 승인 결과: `Authorization`
 - 금전 사실: `LedgerEntry`
-- 정산 묶음: `Settlement`
+- 정산 계산 결과: `Settlement`
+- 실제 송금 시도: `Payout`
 
 이 구조는 부분 취소, 더치페이, 복합 결제를 무리 없이 수용하면서,
 운영 조회와 감사 추적을 동시에 만족시키는 최소한의 확장 가능한 모델이다.
