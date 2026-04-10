@@ -12,7 +12,7 @@ class PayoutReconciliationBatchServiceTest {
     fun `정합성 점검 배치는 upstream 성공이 확인되면 지급과 정산을 성공으로 확정한다`() {
         val settlement = settlement()
         val payout = payout(settlement)
-        payout.markReconciling()
+        payout.markReconciling(OffsetDateTime.parse("2026-04-10T09:30:00+09:00"))
 
         val service = PayoutReconciliationBatchService(
             payoutReader = FakePayoutReader(listOf(payout)),
@@ -32,13 +32,14 @@ class PayoutReconciliationBatchServiceTest {
         assertEquals(PayoutStatus.SUCCEEDED, payout.status)
         assertEquals("bank-tx-001", payout.bankTransferTransactionId)
         assertEquals(SettlementStatus.PAID, settlement.status)
+        assertEquals(OffsetDateTime.parse("2026-04-10T10:00:00+09:00"), payout.lastCheckedAt)
     }
 
     @Test
     fun `정합성 점검 배치는 여전히 모르는 건을 계속 정합성 점검 상태로 유지한다`() {
         val settlement = settlement()
         val payout = payout(settlement)
-        payout.markReconciling()
+        payout.markReconciling(OffsetDateTime.parse("2026-04-10T09:30:00+09:00"))
 
         val service = PayoutReconciliationBatchService(
             payoutReader = FakePayoutReader(listOf(payout)),
@@ -56,6 +57,7 @@ class PayoutReconciliationBatchServiceTest {
 
         assertEquals(PayoutStatus.RECONCILING, payout.status)
         assertEquals(SettlementStatus.PROCESSING, settlement.status)
+        assertEquals(OffsetDateTime.parse("2026-04-10T10:00:00+09:00"), payout.lastCheckedAt)
     }
 
     private class FakePayoutReader(

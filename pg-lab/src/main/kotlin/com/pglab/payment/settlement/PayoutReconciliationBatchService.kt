@@ -9,6 +9,7 @@ class PayoutReconciliationBatchService(
 
         payouts.forEach { payout ->
             val result = upstreamReader.check(payout.bankTransferRequestId)
+            payout.lastCheckedAt = result.checkedAt
             when (result.status) {
                 UpstreamPayoutStatus.SUCCEEDED -> {
                     payout.markSucceeded(result.bankTransferTransactionId ?: payout.bankTransferRequestId, result.checkedAt)
@@ -24,7 +25,7 @@ class PayoutReconciliationBatchService(
                     payout.settlement?.markFailed()
                 }
 
-                UpstreamPayoutStatus.UNKNOWN -> payout.markReconciling()
+                UpstreamPayoutStatus.UNKNOWN -> payout.markReconciling(result.checkedAt)
             }
         }
 
