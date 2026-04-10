@@ -12,7 +12,8 @@ import kotlin.test.assertFailsWith
 class AuthorizePaymentServiceTest {
     @Test
     fun `일반형 승인 서비스는 여러 allocation과 여러 authorization을 함께 처리한다`() {
-        val service = AuthorizePaymentService()
+        val writer = FakeAuthorizePaymentWriter()
+        val service = AuthorizePaymentService(writer)
 
         val result = service.authorize(
             AuthorizePaymentCommand(
@@ -60,11 +61,12 @@ class AuthorizePaymentServiceTest {
         assertEquals(3, result.authorizations.size)
         assertEquals(3, result.ledgerEntries.size)
         assertEquals(setOf(LedgerEntryType.AUTH_CAPTURED), result.ledgerEntries.map { it.type }.toSet())
+        assertEquals(1, writer.savedResults.size)
     }
 
     @Test
     fun `allocation 합이 주문 총액과 다르면 실패한다`() {
-        val service = AuthorizePaymentService()
+        val service = AuthorizePaymentService(FakeAuthorizePaymentWriter())
 
         assertFailsWith<IllegalArgumentException> {
             service.authorize(
@@ -93,7 +95,7 @@ class AuthorizePaymentServiceTest {
 
     @Test
     fun `allocation 내부 authorization 합이 allocation 금액과 다르면 실패한다`() {
-        val service = AuthorizePaymentService()
+        val service = AuthorizePaymentService(FakeAuthorizePaymentWriter())
 
         assertFailsWith<IllegalArgumentException> {
             service.authorize(
@@ -129,6 +131,15 @@ class AuthorizePaymentServiceTest {
                     ),
                 ),
             )
+        }
+    }
+
+    private class FakeAuthorizePaymentWriter : AuthorizePaymentWriter {
+        val savedResults = mutableListOf<AuthorizePaymentResult>()
+
+        override fun save(result: AuthorizePaymentResult): AuthorizePaymentResult {
+            savedResults.add(result)
+            return result
         }
     }
 }
