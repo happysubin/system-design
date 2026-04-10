@@ -34,6 +34,10 @@ class PayoutService {
         payout.markSent(sentAt)
     }
 
+    fun markTimedOut(payout: Payout) {
+        payout.markReconciling()
+    }
+
     fun markSucceeded(payout: Payout, bankTransferTransactionId: String, completedAt: OffsetDateTime) {
         payout.markSucceeded(bankTransferTransactionId, completedAt)
         payout.settlement?.markPaid(completedAt)

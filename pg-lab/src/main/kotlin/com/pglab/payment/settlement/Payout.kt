@@ -70,6 +70,10 @@ class Payout(
         this.sentAt = sentAt
     }
 
+    fun markReconciling() {
+        status = PayoutStatus.RECONCILING
+    }
+
     fun markSucceeded(bankTransferTransactionId: String, completedAt: OffsetDateTime) {
         status = PayoutStatus.SUCCEEDED
         this.bankTransferTransactionId = bankTransferTransactionId

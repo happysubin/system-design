@@ -99,6 +99,25 @@ class PayoutServiceTest {
         assertEquals(SettlementStatus.FAILED, settlement.status)
     }
 
+    @Test
+    fun `지급 timeout이 기록되면 지급 시도는 정합성 점검 상태가 되고 정산은 처리중을 유지한다`() {
+        val settlement = settlement()
+        val service = PayoutService()
+        val payout = service.requestPayout(
+            settlement = settlement,
+            bankCode = "081",
+            bankAccountNumber = "110-123-456789",
+            accountHolderName = "상점A",
+            bankTransferRequestId = "payout-req-001",
+            requestedAt = OffsetDateTime.parse("2026-04-10T09:00:00+09:00"),
+        )
+
+        service.markTimedOut(payout)
+
+        assertEquals(PayoutStatus.RECONCILING, payout.status)
+        assertEquals(SettlementStatus.PROCESSING, settlement.status)
+    }
+
     private fun settlement() = Settlement(
         merchantId = "merchant-1",
         grossAmount = Money(100_000L, CurrencyCode.KRW),
