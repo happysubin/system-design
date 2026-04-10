@@ -1,5 +1,8 @@
 package com.pglab.payment.settlement
 
+import org.springframework.stereotype.Service
+
+@Service
 class PayoutReconciliationBatchService(
     private val payoutReader: ReconciliationPayoutReader,
     private val upstreamReader: UpstreamPayoutReader,
