@@ -58,6 +58,10 @@ class Payout(
     var sentAt: OffsetDateTime? = null,
     @Column
     var completedAt: OffsetDateTime? = null,
+    @Column
+    var reconcilingSince: OffsetDateTime? = null,
+    @Column
+    var lastCheckedAt: OffsetDateTime? = null,
     @Column(length = 64)
     var failureCode: String? = null,
     @Column(length = 1000)
@@ -70,8 +74,12 @@ class Payout(
         this.sentAt = sentAt
     }
 
-    fun markReconciling() {
+    fun markReconciling(reconcilingAt: OffsetDateTime) {
         status = PayoutStatus.RECONCILING
+        if (reconcilingSince == null) {
+            reconcilingSince = reconcilingAt
+        }
+        lastCheckedAt = reconcilingAt
     }
 
     fun markSucceeded(bankTransferTransactionId: String, completedAt: OffsetDateTime) {

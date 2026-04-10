@@ -6,6 +6,7 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class PayoutServiceTest {
     @Test
@@ -116,6 +117,67 @@ class PayoutServiceTest {
 
         assertEquals(PayoutStatus.RECONCILING, payout.status)
         assertEquals(SettlementStatus.PROCESSING, settlement.status)
+        assertEquals(OffsetDateTime.parse("2026-04-10T09:00:00+09:00"), payout.reconcilingSince)
+    }
+
+    @Test
+    fun `활성 지급 시도가 이미 있으면 새 지급 요청을 만들 수 없다`() {
+        val settlement = settlement()
+        val service = PayoutService()
+        val existingPayout = service.requestPayout(
+            settlement = settlement,
+            bankCode = "081",
+            bankAccountNumber = "110-123-456789",
+            accountHolderName = "상점A",
+            bankTransferRequestId = "payout-req-001",
+            requestedAt = OffsetDateTime.parse("2026-04-10T09:00:00+09:00"),
+        )
+        existingPayout.markReconciling(OffsetDateTime.parse("2026-04-10T09:01:00+09:00"))
+
+        assertFailsWith<IllegalStateException> {
+            service.requestPayout(
+                settlement = settlement,
+                bankCode = "081",
+                bankAccountNumber = "110-123-456789",
+                accountHolderName = "상점A",
+                bankTransferRequestId = "payout-req-002",
+                requestedAt = OffsetDateTime.parse("2026-04-10T09:10:00+09:00"),
+                existingPayouts = listOf(existingPayout),
+            )
+        }
+    }
+
+    @Test
+    fun `이전 지급 시도가 실패한 뒤 새 지급 요청을 만들면 재시도 횟수가 증가한다`() {
+        val settlement = settlement()
+        val service = PayoutService()
+        val failedPayout = service.requestPayout(
+            settlement = settlement,
+            bankCode = "081",
+            bankAccountNumber = "110-123-456789",
+            accountHolderName = "상점A",
+            bankTransferRequestId = "payout-req-001",
+            requestedAt = OffsetDateTime.parse("2026-04-10T09:00:00+09:00"),
+        )
+        service.markFailed(
+            payout = failedPayout,
+            failureCode = "BANK_ERROR",
+            failureReason = "일시 장애",
+            completedAt = OffsetDateTime.parse("2026-04-10T09:05:00+09:00"),
+        )
+
+        val retryPayout = service.requestPayout(
+            settlement = settlement,
+            bankCode = "081",
+            bankAccountNumber = "110-123-456789",
+            accountHolderName = "상점A",
+            bankTransferRequestId = "payout-req-002",
+            requestedAt = OffsetDateTime.parse("2026-04-10T09:10:00+09:00"),
+            existingPayouts = listOf(failedPayout),
+        )
+
+        assertEquals(1, retryPayout.retryCount)
+        assertEquals(PayoutStatus.REQUESTED, retryPayout.status)
     }
 
     private fun settlement() = Settlement(

@@ -16,8 +16,14 @@ class PayoutService {
         accountHolderName: String,
         bankTransferRequestId: String,
         requestedAt: OffsetDateTime,
+        existingPayouts: List<Payout> = emptyList(),
     ): Payout {
+        check(existingPayouts.none { it.status == PayoutStatus.REQUESTED || it.status == PayoutStatus.SENT || it.status == PayoutStatus.RECONCILING }) {
+            "active payout already exists"
+        }
+
         settlement.markProcessing()
+        val nextRetryCount = (existingPayouts.maxOfOrNull { it.retryCount } ?: -1) + 1
 
         return Payout(
             settlement = settlement,
@@ -27,6 +33,7 @@ class PayoutService {
             accountHolderName = accountHolderName,
             bankTransferRequestId = bankTransferRequestId,
             requestedAt = requestedAt,
+            retryCount = nextRetryCount,
         )
     }
 
@@ -35,7 +42,7 @@ class PayoutService {
     }
 
     fun markTimedOut(payout: Payout) {
-        payout.markReconciling()
+        payout.markReconciling(payout.sentAt ?: payout.requestedAt)
     }
 
     fun markSucceeded(payout: Payout, bankTransferTransactionId: String, completedAt: OffsetDateTime) {
