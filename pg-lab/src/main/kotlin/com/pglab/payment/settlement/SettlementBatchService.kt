@@ -4,6 +4,7 @@ import com.pglab.payment.ledger.LedgerEntryType
 import com.pglab.payment.ledger.LedgerEntry
 import com.pglab.payment.shared.CurrencyCode
 import com.pglab.payment.shared.Money
+import org.springframework.stereotype.Service
 import java.time.LocalDate
 
 /**
@@ -12,6 +13,7 @@ import java.time.LocalDate
  * 이 서비스는 Spring Batch 잡 자체가 아니라,
  * "정산일 기준 전체 가맹점의 Settlement를 만든다"는 애플리케이션 유스케이스를 표현한다.
  */
+@Service
 class SettlementBatchService(
     private val ledgerReader: SettlementLedgerReader,
     private val settlementStore: SettlementStore,
