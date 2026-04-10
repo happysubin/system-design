@@ -14,7 +14,8 @@ class PartialCancellationServiceTest {
     @Test
     fun `부분취소 시 승인 잔액이 줄고 취소 원장이 생성된다`() {
         val context = mixedAuthorizedContext()
-        val service = PartialCancellationService()
+        val writer = FakePartialCancellationWriter()
+        val service = PartialCancellationService(writer)
 
         val result = service.cancel(
             PartialCancellationCommand(
@@ -31,12 +32,13 @@ class PartialCancellationServiceTest {
         assertEquals(5_000L, result.ledgerEntry.amount.amount)
         assertEquals(PaymentAllocationStatus.PARTIALLY_CANCELED, result.allocation.status)
         assertEquals(PaymentOrderStatus.PARTIALLY_CANCELED, result.order.status)
+        assertEquals(1, writer.savedResults.size)
     }
 
     @Test
     fun `allocation 전체가 취소되면 주문과 부담단위는 취소 완료 상태가 된다`() {
         val context = mixedAuthorizedContext()
-        val service = PartialCancellationService()
+        val service = PartialCancellationService(FakePartialCancellationWriter())
 
         service.cancel(
             PartialCancellationCommand(
@@ -97,4 +99,13 @@ class PartialCancellationServiceTest {
         val allocation: PaymentAllocation,
         val authorizations: List<Authorization>,
     )
+
+    private class FakePartialCancellationWriter : PartialCancellationWriter {
+        val savedResults = mutableListOf<PartialCancellationResult>()
+
+        override fun save(result: PartialCancellationResult): PartialCancellationResult {
+            savedResults.add(result)
+            return result
+        }
+    }
 }

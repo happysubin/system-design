@@ -7,8 +7,14 @@ import com.pglab.payment.ledger.LedgerEntryType
 import com.pglab.payment.order.PaymentOrder
 import com.pglab.payment.order.PaymentOrderStatus
 import com.pglab.payment.shared.Money
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
-class PartialCancellationService {
+@Service
+class PartialCancellationService(
+    private val writer: PartialCancellationWriter,
+) {
+    @Transactional
     fun cancel(command: PartialCancellationCommand): PartialCancellationResult {
         // 취소 핵심 검증과 잔액 감소는 Authorization이 책임진다.
         // 서비스는 그 결과를 원장과 상위 집계 상태에 반영하는 역할을 맡는다.
@@ -41,13 +47,19 @@ class PartialCancellationService {
         }
 
         // 호출자는 반환된 authorization/ledger/order 상태를 그대로 후속 저장 또는 응답에 사용할 수 있다.
-        return PartialCancellationResult(
+        val result = PartialCancellationResult(
             order = command.order,
             allocation = command.allocation,
             authorization = command.authorization,
             ledgerEntry = ledgerEntry,
         )
+
+        return writer.save(result)
     }
+}
+
+interface PartialCancellationWriter {
+    fun save(result: PartialCancellationResult): PartialCancellationResult
 }
 
 data class PartialCancellationCommand(
