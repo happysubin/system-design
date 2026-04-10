@@ -13,11 +13,11 @@ class SettlementBatchServiceTest {
         val targetDate = LocalDate.of(2026, 4, 10)
         val reader = FakeSettlementLedgerReader(
             listOf(
-                SettlementLedgerRecord("merchant-1", LedgerEntryType.AUTH_CAPTURED, Money(100_000L, CurrencyCode.KRW)),
-                SettlementLedgerRecord("merchant-1", LedgerEntryType.CANCELLED, Money(10_000L, CurrencyCode.KRW)),
-                SettlementLedgerRecord("merchant-1", LedgerEntryType.FEE_BOOKED, Money(3_000L, CurrencyCode.KRW)),
-                SettlementLedgerRecord("merchant-2", LedgerEntryType.AUTH_CAPTURED, Money(50_000L, CurrencyCode.KRW)),
-                SettlementLedgerRecord("merchant-2", LedgerEntryType.FEE_BOOKED, Money(500L, CurrencyCode.KRW)),
+                SettlementLedgerRecord(ledgerEntry(1L, LedgerEntryType.AUTH_CAPTURED, 100_000L), "merchant-1"),
+                SettlementLedgerRecord(ledgerEntry(2L, LedgerEntryType.CANCELLED, 10_000L), "merchant-1"),
+                SettlementLedgerRecord(ledgerEntry(3L, LedgerEntryType.FEE_BOOKED, 3_000L), "merchant-1"),
+                SettlementLedgerRecord(ledgerEntry(4L, LedgerEntryType.AUTH_CAPTURED, 50_000L), "merchant-2"),
+                SettlementLedgerRecord(ledgerEntry(5L, LedgerEntryType.FEE_BOOKED, 500L), "merchant-2"),
             ),
         )
         val store = FakeSettlementStore()
@@ -34,6 +34,8 @@ class SettlementBatchServiceTest {
         assertEquals(87_000L, merchantOne.netAmount.amount)
         assertEquals(SettlementStatus.SCHEDULED, merchantOne.status)
         assertEquals(targetDate, merchantOne.scheduledDate)
+        assertEquals(3, merchantOne.lines.size)
+        assertEquals(setOf(1L, 2L, 3L), merchantOne.lines.mapNotNull { it.ledgerEntry?.id }.toSet())
 
         val merchantTwo = settlementsByMerchant.getValue("merchant-2")
         assertEquals(50_000L, merchantTwo.grossAmount.amount)
@@ -41,6 +43,8 @@ class SettlementBatchServiceTest {
         assertEquals(49_500L, merchantTwo.netAmount.amount)
         assertEquals(SettlementStatus.SCHEDULED, merchantTwo.status)
         assertEquals(targetDate, merchantTwo.scheduledDate)
+        assertEquals(2, merchantTwo.lines.size)
+        assertEquals(setOf(4L, 5L), merchantTwo.lines.mapNotNull { it.ledgerEntry?.id }.toSet())
 
         assertEquals(2, store.savedSettlements.size)
     }
@@ -50,6 +54,15 @@ class SettlementBatchServiceTest {
     ) : SettlementLedgerReader {
         override fun findSettlableEntries(targetDate: LocalDate): List<SettlementLedgerRecord> = records
     }
+
+    private fun ledgerEntry(id: Long, type: LedgerEntryType, amount: Long) =
+        com.pglab.payment.ledger.LedgerEntry(
+            id = id,
+            type = type,
+            amount = Money(amount, CurrencyCode.KRW),
+            referenceTransactionId = "tx-$id",
+            description = "test-source-$id",
+        )
 
     private class FakeSettlementStore : SettlementStore {
         var savedSettlements: List<Settlement> = emptyList()

@@ -5,6 +5,7 @@ import com.pglab.payment.shared.Money
 import jakarta.persistence.AttributeOverride
 import jakarta.persistence.AttributeOverrides
 import jakarta.persistence.Column
+import jakarta.persistence.CascadeType
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -12,6 +13,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -102,5 +104,20 @@ class Settlement(
      *
      * 예정일과 비교하거나 지급 완료 감사 추적을 남길 때 기준이 된다.
      */
-    val settledAt: OffsetDateTime? = null,
-)
+    var settledAt: OffsetDateTime? = null,
+    @OneToMany(mappedBy = "settlement", cascade = [CascadeType.ALL], orphanRemoval = true)
+    val lines: MutableList<SettlementLine> = mutableListOf(),
+) {
+    fun markProcessing() {
+        status = SettlementStatus.PROCESSING
+    }
+
+    fun markPaid(completedAt: OffsetDateTime) {
+        status = SettlementStatus.PAID
+        settledAt = completedAt
+    }
+
+    fun markFailed() {
+        status = SettlementStatus.FAILED
+    }
+}

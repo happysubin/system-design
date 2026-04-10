@@ -1,6 +1,7 @@
 package com.pglab.payment.settlement
 
 import com.pglab.payment.ledger.LedgerEntryType
+import com.pglab.payment.ledger.LedgerEntry
 import com.pglab.payment.shared.CurrencyCode
 import com.pglab.payment.shared.Money
 import java.time.LocalDate
@@ -19,17 +20,17 @@ class SettlementBatchService(
         val settlements = ledgerReader.findSettlableEntries(targetDate)
             .groupBy { it.merchantId }
             .map { (merchantId, records) ->
-                val currency = records.firstOrNull()?.amount?.currency ?: CurrencyCode.KRW
+                val currency = records.firstOrNull()?.ledgerEntry?.amount?.currency ?: CurrencyCode.KRW
                 val grossAmount = records
-                    .filter { it.type == LedgerEntryType.AUTH_CAPTURED }
-                    .sumOf { it.amount.amount } - records
-                    .filter { it.type == LedgerEntryType.CANCELLED || it.type == LedgerEntryType.REFUNDED }
-                    .sumOf { it.amount.amount }
+                    .filter { it.ledgerEntry.type == LedgerEntryType.AUTH_CAPTURED }
+                    .sumOf { it.ledgerEntry.amount.amount } - records
+                    .filter { it.ledgerEntry.type == LedgerEntryType.CANCELLED || it.ledgerEntry.type == LedgerEntryType.REFUNDED }
+                    .sumOf { it.ledgerEntry.amount.amount }
                 val feeAmount = records
-                    .filter { it.type == LedgerEntryType.FEE_BOOKED }
-                    .sumOf { it.amount.amount }
+                    .filter { it.ledgerEntry.type == LedgerEntryType.FEE_BOOKED }
+                    .sumOf { it.ledgerEntry.amount.amount }
 
-                Settlement(
+                val settlement = Settlement(
                     merchantId = merchantId,
                     grossAmount = Money(grossAmount, currency),
                     feeAmount = Money(feeAmount, currency),
@@ -37,6 +38,17 @@ class SettlementBatchService(
                     status = SettlementStatus.SCHEDULED,
                     scheduledDate = targetDate,
                 )
+
+                records.forEach { record ->
+                    settlement.lines.add(
+                        SettlementLine(
+                            settlement = settlement,
+                            ledgerEntry = record.ledgerEntry,
+                        ),
+                    )
+                }
+
+                settlement
             }
 
         return settlementStore.saveAll(settlements)
@@ -44,9 +56,8 @@ class SettlementBatchService(
 }
 
 data class SettlementLedgerRecord(
+    val ledgerEntry: LedgerEntry,
     val merchantId: String,
-    val type: LedgerEntryType,
-    val amount: Money,
 )
 
 interface SettlementLedgerReader {
