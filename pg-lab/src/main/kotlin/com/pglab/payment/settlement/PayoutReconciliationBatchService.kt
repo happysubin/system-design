@@ -3,6 +3,7 @@ package com.pglab.payment.settlement
 class PayoutReconciliationBatchService(
     private val payoutReader: ReconciliationPayoutReader,
     private val upstreamReader: UpstreamPayoutReader,
+    private val payoutWriter: ReconciliationPayoutWriter,
 ) {
     fun reconcile(): List<Payout> {
         val payouts = payoutReader.findReconciliationTargets()
@@ -29,12 +30,16 @@ class PayoutReconciliationBatchService(
             }
         }
 
-        return payouts
+        return payoutWriter.saveAll(payouts)
     }
 }
 
 interface ReconciliationPayoutReader {
     fun findReconciliationTargets(): List<Payout>
+}
+
+interface ReconciliationPayoutWriter {
+    fun saveAll(payouts: List<Payout>): List<Payout>
 }
 
 interface UpstreamPayoutReader {

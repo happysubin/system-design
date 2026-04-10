@@ -25,6 +25,7 @@ class PayoutReconciliationBatchServiceTest {
                     ),
                 ),
             ),
+            payoutWriter = FakePayoutWriter(),
         )
 
         service.reconcile()
@@ -51,6 +52,7 @@ class PayoutReconciliationBatchServiceTest {
                     ),
                 ),
             ),
+            payoutWriter = FakePayoutWriter(),
         )
 
         service.reconcile()
@@ -58,6 +60,33 @@ class PayoutReconciliationBatchServiceTest {
         assertEquals(PayoutStatus.RECONCILING, payout.status)
         assertEquals(SettlementStatus.PROCESSING, settlement.status)
         assertEquals(OffsetDateTime.parse("2026-04-10T10:00:00+09:00"), payout.lastCheckedAt)
+    }
+
+    @Test
+    fun `정합성 점검 배치는 확인이 끝난 지급 시도를 writer로 저장한다`() {
+        val settlement = settlement()
+        val payout = payout(settlement)
+        payout.markReconciling(OffsetDateTime.parse("2026-04-10T09:30:00+09:00"))
+        val writer = FakePayoutWriter()
+
+        val service = PayoutReconciliationBatchService(
+            payoutReader = FakePayoutReader(listOf(payout)),
+            upstreamReader = FakeUpstreamReader(
+                mapOf(
+                    payout.bankTransferRequestId to UpstreamPayoutCheckResult(
+                        status = UpstreamPayoutStatus.SUCCEEDED,
+                        bankTransferTransactionId = "bank-tx-001",
+                        checkedAt = OffsetDateTime.parse("2026-04-10T10:00:00+09:00"),
+                    ),
+                ),
+            ),
+            payoutWriter = writer,
+        )
+
+        service.reconcile()
+
+        assertEquals(1, writer.savedPayouts.size)
+        assertEquals(PayoutStatus.SUCCEEDED, writer.savedPayouts.single().status)
     }
 
     private class FakePayoutReader(
@@ -71,6 +100,16 @@ class PayoutReconciliationBatchServiceTest {
     ) : UpstreamPayoutReader {
         override fun check(bankTransferRequestId: String): UpstreamPayoutCheckResult =
             results.getValue(bankTransferRequestId)
+    }
+
+    private class FakePayoutWriter : ReconciliationPayoutWriter {
+        val savedPayouts = mutableListOf<Payout>()
+
+        override fun saveAll(payouts: List<Payout>): List<Payout> {
+            savedPayouts.clear()
+            savedPayouts.addAll(payouts)
+            return payouts
+        }
     }
 
     private fun settlement() = Settlement(
