@@ -1,5 +1,6 @@
 package com.pglab.payment.settlement
 
+import org.springframework.stereotype.Service
 import java.time.OffsetDateTime
 
 /**
@@ -8,6 +9,7 @@ import java.time.OffsetDateTime
  * 정산 계산 결과를 바로 송금 상태로 바꾸지 않고,
  * Payout을 생성하고 그 결과에 따라 Settlement와 Payout 상태를 함께 전이시킨다.
  */
+@Service
 class PayoutService {
     fun requestPayout(
         settlement: Settlement,
