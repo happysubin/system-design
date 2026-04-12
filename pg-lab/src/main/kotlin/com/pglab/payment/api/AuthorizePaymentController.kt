@@ -3,7 +3,7 @@ package com.pglab.payment.api
 import com.pglab.payment.authorization.AllocationAuthorizationRequest
 import com.pglab.payment.authorization.AuthorizationRequest
 import com.pglab.payment.authorization.AuthorizePaymentCommand
-import com.pglab.payment.authorization.AuthorizePaymentService
+import com.pglab.payment.authorization.AuthorizationFacade
 import com.pglab.payment.shared.CurrencyCode
 import com.pglab.payment.shared.Money
 import org.springframework.web.bind.annotation.PostMapping
@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/payments")
 class AuthorizePaymentController(
-    private val authorizePaymentService: AuthorizePaymentService,
+    private val authorizationFacade: AuthorizationFacade,
 ) {
     @PostMapping("/authorize")
     fun authorize(@RequestBody request: AuthorizePaymentApiRequest): AuthorizePaymentApiResponse {
@@ -39,14 +39,15 @@ class AuthorizePaymentController(
             },
         )
 
-        val result = authorizePaymentService.authorize(command)
+        val result = authorizationFacade.authorize(command)
 
         return AuthorizePaymentApiResponse(
-            orderId = result.order.id ?: 0L,
-            orderStatus = result.order.status.name,
-            allocationCount = result.allocations.size,
-            authorizationCount = result.authorizations.size,
-            ledgerEntryCount = result.ledgerEntries.size,
+            orderId = result.authorizePaymentResult.order.id ?: 0L,
+            orderStatus = result.authorizePaymentResult.order.status.name,
+            allocationCount = result.authorizePaymentResult.allocations.size,
+            authorizationCount = result.authorizePaymentResult.authorizations.size,
+            ledgerEntryCount = result.authorizePaymentResult.ledgerEntries.size,
+            upstreamResult = result.upstreamResult,
         )
     }
 }
@@ -79,4 +80,5 @@ data class AuthorizePaymentApiResponse(
     val allocationCount: Int,
     val authorizationCount: Int,
     val ledgerEntryCount: Int,
+    val upstreamResult: String,
 )

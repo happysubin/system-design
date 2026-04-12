@@ -71,5 +71,6 @@ class AuthorizePaymentApiTest(
             .andExpect(jsonPath("$.allocationCount").value(2))
             .andExpect(jsonPath("$.authorizationCount").value(3))
             .andExpect(jsonPath("$.ledgerEntryCount").value(3))
+            .andExpect(jsonPath("$.upstreamResult").value("APPROVED"))
     }
 }
