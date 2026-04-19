@@ -12,7 +12,7 @@ class PayoutServiceTest {
     @Test
     fun `지급 요청을 시작하면 정산은 처리중 상태가 되고 지급 시도가 생성된다`() {
         val settlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "payee-1",
             grossAmount = Money(100_000L, CurrencyCode.KRW),
             feeAmount = Money(3_000L, CurrencyCode.KRW),
             netAmount = Money(97_000L, CurrencyCode.KRW),
@@ -181,7 +181,7 @@ class PayoutServiceTest {
     }
 
     private fun settlement() = Settlement(
-        merchantId = "merchant-1",
+        payeeId = "payee-1",
         grossAmount = Money(100_000L, CurrencyCode.KRW),
         feeAmount = Money(3_000L, CurrencyCode.KRW),
         netAmount = Money(97_000L, CurrencyCode.KRW),
