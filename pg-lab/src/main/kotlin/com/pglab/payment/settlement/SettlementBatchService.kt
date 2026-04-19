@@ -8,10 +8,10 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 
 /**
- * 정산 대상 원장 데이터를 읽어 가맹점별 예정 정산 건을 생성하는 배치 서비스다.
+ * 정산 대상 원장 데이터를 읽어 payee별 예정 정산 건을 생성하는 배치 서비스다.
  *
  * 이 서비스는 Spring Batch 잡 자체가 아니라,
- * "정산일 기준 전체 가맹점의 Settlement를 만든다"는 애플리케이션 유스케이스를 표현한다.
+ * "정산일 기준 전체 payee의 Settlement를 만든다"는 애플리케이션 유스케이스를 표현한다.
  */
 @Service
 class SettlementBatchService(
@@ -22,11 +22,11 @@ class SettlementBatchService(
         // 먼저 정산 기준일에 정산 가능한 원장 사실들을 모두 읽는다.
         // 이 단계에서는 아직 가맹점별 정산 건으로 묶이지 않은 상태다.
         val settlements = ledgerReader.findSettlableEntries(targetDate)
-            .groupBy { it.merchantId }
-            .map { (merchantId, records) ->
+            .groupBy { it.payeeId to it.ledgerEntry.amount.currency }
+            .map { groupedRecords ->
+                val (groupingKey, records) = groupedRecords
+                val (payeeId, currency) = groupingKey
                 // 같은 정산건 안에서는 통화가 같다고 가정하므로 첫 원장 통화를 대표값으로 사용한다.
-                val currency = records.firstOrNull()?.ledgerEntry?.amount?.currency ?: CurrencyCode.KRW
-
                 // gross는 승인 총액에서 취소/환불로 빠진 금액을 제외한 실제 정산 대상 기준 총액이다.
                 val grossAmount = records
                     .filter { it.ledgerEntry.type == LedgerEntryType.AUTH_CAPTURED }
@@ -42,7 +42,7 @@ class SettlementBatchService(
                 // 이 시점의 Settlement는 "실제 지급 완료"가 아니라
                 // 정산 예정 건이 계산되었다는 의미이므로 SCHEDULED로 생성한다.
                 val settlement = Settlement(
-                    merchantId = merchantId,
+                    payeeId = payeeId,
                     grossAmount = Money(grossAmount, currency),
                     feeAmount = Money(feeAmount, currency),
                     netAmount = Money(grossAmount - feeAmount, currency),
@@ -52,9 +52,8 @@ class SettlementBatchService(
 
                 // SettlementLine으로 어떤 원장 사실들이 이번 정산건 계산에 포함되었는지 보존한다.
                 records.forEach { record ->
-                    settlement.lines.add(
+                    settlement.addLine(
                         SettlementLine(
-                            settlement = settlement,
                             ledgerEntry = record.ledgerEntry,
                         ),
                     )
@@ -70,7 +69,7 @@ class SettlementBatchService(
 
 data class SettlementLedgerRecord(
     val ledgerEntry: LedgerEntry,
-    val merchantId: String,
+    val payeeId: String,
 )
 
 interface SettlementLedgerReader {

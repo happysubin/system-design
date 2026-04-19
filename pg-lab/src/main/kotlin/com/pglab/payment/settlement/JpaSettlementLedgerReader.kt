@@ -29,6 +29,6 @@ class JpaSettlementLedgerReader(
             .setParameter("end", end)
             .resultList
 
-        return entries.map { SettlementLedgerRecord(it, it.paymentOrder?.merchantId ?: "") }
+        return entries.map { SettlementLedgerRecord(it, it.payeeId) }
     }
 }
