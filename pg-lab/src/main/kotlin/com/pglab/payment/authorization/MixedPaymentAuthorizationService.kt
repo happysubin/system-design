@@ -5,6 +5,7 @@ import com.pglab.payment.allocation.PaymentAllocationStatus
 import com.pglab.payment.ledger.LedgerEntry
 import com.pglab.payment.ledger.LedgerEntryType
 import com.pglab.payment.order.PaymentOrder
+import com.pglab.payment.order.PaymentOrderLine
 import com.pglab.payment.order.PaymentOrderStatus
 import com.pglab.payment.shared.Money
 import java.time.OffsetDateTime
@@ -53,6 +54,12 @@ class MixedPaymentAuthorizationService {
             totalAmount = command.totalAmount,
             status = finalStatus,
         )
+        val orderLine = PaymentOrderLine(
+            lineReference = "mixed-payment-line-1",
+            payeeId = command.payeeId,
+            lineAmount = command.totalAmount,
+            quantity = 1,
+        ).also(order::addLine)
 
         // 이번 유즈케이스는 "한 사람의 결제를 여러 수단으로 나누는 혼합결제" 기준이므로,
         // allocation은 1개만 만들고 그 아래에 여러 Authorization을 붙인다.
@@ -75,21 +82,36 @@ class MixedPaymentAuthorizationService {
                 pgTransactionId = request.pgTransactionId,
                 approvalCode = request.approvalCode,
                 approvedAt = request.approvedAt,
-            )
+            ).also { authorization ->
+                authorization.addLinePortion(
+                    AuthorizationLinePortion(
+                        paymentOrderLine = orderLine,
+                        payeeId = command.payeeId,
+                        amount = request.approvedAmount,
+                        sequence = 1,
+                    ),
+                )
+            }
         }
 
         // 승인 사실은 append-only 원장에도 각각 남긴다.
         // 이후 정산/환불/취소는 이 원장 기록을 근거로 집계된다.
-        val ledgerEntries = authorizations.map { authorization ->
-            LedgerEntry(
-                paymentOrder = order,
-                paymentAllocation = allocation,
-                authorization = authorization,
-                type = LedgerEntryType.AUTH_CAPTURED,
-                amount = authorization.approvedAmount,
-                referenceTransactionId = authorization.pgTransactionId,
-                description = "mixed payment authorization",
-            )
+        val ledgerEntries = authorizations.flatMap { authorization ->
+            val occurredAt = authorization.approvedAt ?: OffsetDateTime.now()
+            authorization.linePortions.map { linePortion ->
+                LedgerEntry(
+                    paymentOrder = order,
+                    paymentAllocation = allocation,
+                    authorization = authorization,
+                    paymentOrderLine = linePortion.paymentOrderLine,
+                    payeeId = linePortion.payeeId,
+                    type = LedgerEntryType.AUTH_CAPTURED,
+                    amount = linePortion.amount,
+                    occurredAt = occurredAt,
+                    referenceTransactionId = authorization.pgTransactionId,
+                    description = "mixed payment authorization",
+                )
+            }
         }
 
         // 유즈케이스 결과는 아직 영속화되지 않은 순수 도메인 조립 결과다.
@@ -106,6 +128,7 @@ class MixedPaymentAuthorizationService {
 data class MixedPaymentAuthorizationCommand(
     val merchantId: String,
     val merchantOrderId: String,
+    val payeeId: String,
     val payerReference: String,
     val totalAmount: Money,
     val authorizationRequests: List<MixedAuthorizationRequest>,

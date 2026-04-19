@@ -18,6 +18,7 @@ class MixedPaymentAuthorizationServiceTest {
             MixedPaymentAuthorizationCommand(
                 merchantId = "merchant-1",
                 merchantOrderId = "order-001",
+                payeeId = "payee-1",
                 payerReference = "payer-A",
                 totalAmount = Money(50_000L, CurrencyCode.KRW),
                 authorizationRequests = listOf(
@@ -40,10 +41,15 @@ class MixedPaymentAuthorizationServiceTest {
 
         assertEquals(PaymentOrderStatus.AUTHORIZED, result.order.status)
         assertEquals(PaymentAllocationStatus.AUTHORIZED, result.allocation.status)
+        assertEquals(1, result.order.lines.size)
+        assertEquals("payee-1", result.order.lines.single().payeeId)
         assertEquals(2, result.authorizations.size)
         assertEquals(2, result.ledgerEntries.size)
+        assertEquals(setOf(1), result.authorizations.map { it.linePortions.size }.toSet())
         assertEquals(setOf(InstrumentType.BANK_ACCOUNT, InstrumentType.CARD), result.authorizations.map { it.instrumentType }.toSet())
         assertEquals(setOf(LedgerEntryType.AUTH_CAPTURED), result.ledgerEntries.map { it.type }.toSet())
+        assertEquals(setOf("payee-1"), result.ledgerEntries.map { it.payeeId }.toSet())
+        assertEquals(setOf(result.order.lines.single()), result.ledgerEntries.mapNotNull { it.paymentOrderLine }.toSet())
     }
 
     @Test
@@ -55,6 +61,7 @@ class MixedPaymentAuthorizationServiceTest {
                 MixedPaymentAuthorizationCommand(
                     merchantId = "merchant-1",
                     merchantOrderId = "order-002",
+                    payeeId = "payee-1",
                     payerReference = "payer-A",
                     totalAmount = Money(50_000L, CurrencyCode.KRW),
                     authorizationRequests = listOf(
@@ -84,6 +91,7 @@ class MixedPaymentAuthorizationServiceTest {
             MixedPaymentAuthorizationCommand(
                 merchantId = "merchant-1",
                 merchantOrderId = "order-003",
+                payeeId = "payee-1",
                 payerReference = "payer-A",
                 totalAmount = Money(50_000L, CurrencyCode.KRW),
                 authorizationRequests = listOf(
