@@ -3,6 +3,7 @@ package com.pglab.payment.authorization
 import com.pglab.payment.allocation.PaymentAllocation
 import com.pglab.payment.shared.CurrencyCode
 import com.pglab.payment.shared.Money
+import jakarta.persistence.CascadeType
 import jakarta.persistence.AttributeOverride
 import jakarta.persistence.AttributeOverrides
 import jakarta.persistence.Column
@@ -16,6 +17,7 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import java.time.OffsetDateTime
 
@@ -135,7 +137,46 @@ class Authorization(
      * 승인 시점 추적, 취소 허용 시간 계산, 외부 거래 대조 같은 후속 로직의 기준 시각이 된다.
      */
     val approvedAt: OffsetDateTime? = null,
+    @OneToMany(mappedBy = "authorizationInternal", cascade = [CascadeType.ALL], orphanRemoval = true)
+    private val linePortionsInternal: MutableList<AuthorizationLinePortion> = mutableListOf(),
 ) {
+    val linePortions: List<AuthorizationLinePortion>
+        get() = linePortionsInternal
+
+    fun addLinePortion(linePortion: AuthorizationLinePortion) {
+        require(linePortion.authorization == null || linePortion.authorization == this) {
+            "authorization line portion already belongs to another authorization"
+        }
+
+        val allocationOrder = requireNotNull(paymentAllocation?.paymentOrder) {
+            "authorization payment allocation must belong to a payment order"
+        }
+        require(linePortion.paymentOrderLine?.paymentOrder == allocationOrder) {
+            "authorization line portion must belong to the same payment order as the authorization"
+        }
+
+        val updatedPortionAmount = linePortionsInternal.sumOf { it.amount.amount } + linePortion.amount.amount
+        require(updatedPortionAmount <= approvedAmount.amount) {
+            "authorization line portions must not exceed approved amount"
+        }
+        require(linePortionsInternal.none { it.paymentOrderLine == linePortion.paymentOrderLine }) {
+            "authorization must not contain multiple line portions for the same order line"
+        }
+
+        if (linePortionsInternal.contains(linePortion)) {
+            return
+        }
+
+        linePortion.attachTo(this)
+        linePortionsInternal.add(linePortion)
+    }
+
+    fun removeLinePortion(linePortion: AuthorizationLinePortion) {
+        if (linePortionsInternal.remove(linePortion)) {
+            linePortion.detach()
+        }
+    }
+
     /**
      * 승인 금액 일부를 취소 처리한다.
      *
@@ -143,6 +184,9 @@ class Authorization(
      * 이 메서드는 그 결과를 운영 조회용 잔액과 상태에 반영하는 최소 도메인 규칙을 담는다.
      */
     fun cancel(amount: Money) {
+        require(amount.amount > 0L) {
+            "cancel amount must be greater than zero"
+        }
         require(amount.currency == remainingCancelableAmount.currency) {
             "cancel currency must match remaining cancelable currency"
         }
