@@ -1,6 +1,7 @@
 package com.pglab.payment.api
 
 import com.pglab.payment.settlement.SettlementBatchService
+import com.pglab.payment.shared.CurrencyCode
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -19,10 +20,29 @@ class SettlementBatchController(
         return SettlementBatchApiResponse(
             targetDate = request.targetDate,
             settlementCount = settlements.size,
-            merchantCount = settlements.map { it.merchantId }.distinct().size,
-            totalGrossAmount = settlements.sumOf { it.grossAmount.amount },
-            totalNetAmount = settlements.sumOf { it.netAmount.amount },
+            payeeCount = settlements.map { it.payeeId }.distinct().size,
+            totalGrossAmount = summarizeSingleCurrencyAmount(
+                settlements.map { it.grossAmount.currency }.distinct(),
+                settlements.map { it.grossAmount.amount },
+                "mixed settlement gross currencies cannot be summarized into a single total",
+            ),
+            totalNetAmount = summarizeSingleCurrencyAmount(
+                settlements.map { it.netAmount.currency }.distinct(),
+                settlements.map { it.netAmount.amount },
+                "mixed settlement net currencies cannot be summarized into a single total",
+            ),
         )
+    }
+
+    private fun summarizeSingleCurrencyAmount(
+        currencies: List<CurrencyCode>,
+        amounts: List<Long>,
+        errorMessage: String,
+    ): Long {
+        require(currencies.size <= 1) {
+            errorMessage
+        }
+        return amounts.sum()
     }
 }
 
@@ -33,7 +53,7 @@ data class SettlementBatchApiRequest(
 data class SettlementBatchApiResponse(
     val targetDate: String,
     val settlementCount: Int,
-    val merchantCount: Int,
+    val payeeCount: Int,
     val totalGrossAmount: Long,
     val totalNetAmount: Long,
 )
