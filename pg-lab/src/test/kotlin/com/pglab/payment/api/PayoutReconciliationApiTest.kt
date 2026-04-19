@@ -45,7 +45,7 @@ class PayoutReconciliationApiTest(
 
     private fun prepareReconcilingPayout() {
         val settlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "payee-1",
             grossAmount = Money(100_000L, CurrencyCode.KRW),
             feeAmount = Money(3_000L, CurrencyCode.KRW),
             netAmount = Money(97_000L, CurrencyCode.KRW),
