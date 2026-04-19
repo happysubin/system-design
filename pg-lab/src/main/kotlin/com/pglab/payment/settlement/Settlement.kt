@@ -40,12 +40,12 @@ class Settlement(
     val id: Long? = null,
     @Column(nullable = false)
     /**
-     * 정산 대상이 되는 가맹점 식별자다.
+     * 정산 대상이 되는 payee 식별자다.
      *
-     * 결제는 고객 관점 흐름이지만 정산은 가맹점 관점 집계이므로,
-     * 정산 단위에서는 merchant 식별이 별도 축이 된다.
+     * 주문 merchant와 별개로 실제 정산 귀속 대상을 구분해야 하므로,
+     * 정산 단위에서는 payee가 핵심 식별 축이 된다.
      */
-    val merchantId: String = "",
+    val payeeId: String = "",
     @Embedded
     @AttributeOverrides(
         AttributeOverride(name = "amount", column = Column(name = "gross_amount", nullable = false)),
@@ -105,9 +105,36 @@ class Settlement(
      * 예정일과 비교하거나 지급 완료 감사 추적을 남길 때 기준이 된다.
      */
     var settledAt: OffsetDateTime? = null,
-    @OneToMany(mappedBy = "settlement", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val lines: MutableList<SettlementLine> = mutableListOf(),
+    @OneToMany(mappedBy = "settlementInternal", cascade = [CascadeType.ALL], orphanRemoval = true)
+    private val linesInternal: MutableList<SettlementLine> = mutableListOf(),
 ) {
+    val lines: List<SettlementLine>
+        get() = linesInternal
+
+    fun addLine(line: SettlementLine) {
+        require(line.settlement == null || line.settlement == this) {
+            "settlement line already belongs to another settlement"
+        }
+        val ledgerEntry = requireNotNull(line.ledgerEntry) {
+            "settlement line must reference a ledger entry"
+        }
+        require(ledgerEntry.payeeId == payeeId) {
+            "settlement line ledger entry payee must match settlement payee"
+        }
+        if (linesInternal.contains(line)) {
+            return
+        }
+
+        line.attachTo(this)
+        linesInternal.add(line)
+    }
+
+    fun removeLine(line: SettlementLine) {
+        if (linesInternal.remove(line)) {
+            line.detach()
+        }
+    }
+
     fun markProcessing() {
         status = SettlementStatus.PROCESSING
     }

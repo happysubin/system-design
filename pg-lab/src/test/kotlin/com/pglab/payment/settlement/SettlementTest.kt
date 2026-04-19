@@ -8,17 +8,19 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class SettlementTest {
     @Test
     fun `정산은 총액 수수료 순액을 보관한다`() {
         val settlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "payee-1",
             grossAmount = Money(50_000L, CurrencyCode.KRW),
             feeAmount = Money(1_000L, CurrencyCode.KRW),
             netAmount = Money(49_000L, CurrencyCode.KRW),
         )
 
+        assertEquals("payee-1", settlement.payeeId)
         assertEquals(49_000L, settlement.netAmount.amount)
         assertEquals(SettlementStatus.READY, settlement.status)
     }
@@ -26,12 +28,13 @@ class SettlementTest {
     @Test
     fun `정산은 근거 원장 라인을 보관할 수 있다`() {
         val settlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "payee-1",
             grossAmount = Money(50_000L, CurrencyCode.KRW),
             feeAmount = Money(1_000L, CurrencyCode.KRW),
             netAmount = Money(49_000L, CurrencyCode.KRW),
         )
         val ledgerEntry = LedgerEntry(
+            payeeId = "payee-1",
             type = LedgerEntryType.AUTH_CAPTURED,
             amount = Money(50_000L, CurrencyCode.KRW),
             referenceTransactionId = "tx-1",
@@ -39,18 +42,39 @@ class SettlementTest {
         )
 
         val settlementLine = SettlementLine(
-            settlement = settlement,
             ledgerEntry = ledgerEntry,
         )
+        settlement.addLine(settlementLine)
 
         assertEquals(settlement, settlementLine.settlement)
         assertEquals(ledgerEntry, settlementLine.ledgerEntry)
     }
 
     @Test
+    fun `정산은 다른 payee 원장 라인을 추가할 수 없다`() {
+        val settlement = Settlement(
+            payeeId = "payee-1",
+            grossAmount = Money(50_000L, CurrencyCode.KRW),
+            feeAmount = Money(1_000L, CurrencyCode.KRW),
+            netAmount = Money(49_000L, CurrencyCode.KRW),
+        )
+        val ledgerEntry = LedgerEntry(
+            payeeId = "payee-2",
+            type = LedgerEntryType.AUTH_CAPTURED,
+            amount = Money(50_000L, CurrencyCode.KRW),
+            referenceTransactionId = "tx-2",
+            description = "settlement source mismatch",
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            settlement.addLine(SettlementLine(ledgerEntry = ledgerEntry))
+        }
+    }
+
+    @Test
     fun `정산은 지급 처리를 시작하면 처리중 상태가 된다`() {
         val settlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "payee-1",
             grossAmount = Money(50_000L, CurrencyCode.KRW),
             feeAmount = Money(1_000L, CurrencyCode.KRW),
             netAmount = Money(49_000L, CurrencyCode.KRW),
@@ -67,7 +91,7 @@ class SettlementTest {
     fun `정산은 지급이 완료되면 완료 상태와 완료 시각을 가진다`() {
         val completedAt = OffsetDateTime.parse("2026-04-10T12:00:00+09:00")
         val settlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "payee-1",
             grossAmount = Money(50_000L, CurrencyCode.KRW),
             feeAmount = Money(1_000L, CurrencyCode.KRW),
             netAmount = Money(49_000L, CurrencyCode.KRW),
@@ -83,7 +107,7 @@ class SettlementTest {
     @Test
     fun `정산은 지급 실패를 기록할 수 있다`() {
         val settlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "payee-1",
             grossAmount = Money(50_000L, CurrencyCode.KRW),
             feeAmount = Money(1_000L, CurrencyCode.KRW),
             netAmount = Money(49_000L, CurrencyCode.KRW),

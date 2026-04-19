@@ -28,9 +28,27 @@ class SettlementLine(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "settlement_id", nullable = false)
-    val settlement: Settlement? = null,
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ledger_entry_id", nullable = false)
     val ledgerEntry: LedgerEntry? = null,
-)
+) {
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "settlement_id", nullable = false)
+    private var settlementInternal: Settlement? = null
+
+    val settlement: Settlement?
+        get() = settlementInternal
+
+    internal fun attachTo(settlement: Settlement) {
+        val currentLedgerEntry = requireNotNull(ledgerEntry) {
+            "settlement line must reference a ledger entry"
+        }
+        require(currentLedgerEntry.payeeId == settlement.payeeId) {
+            "settlement line ledger entry payee must match settlement payee"
+        }
+        settlementInternal = settlement
+    }
+
+    internal fun detach() {
+        settlementInternal = null
+    }
+}
