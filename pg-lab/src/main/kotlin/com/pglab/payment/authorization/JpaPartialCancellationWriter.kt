@@ -11,7 +11,7 @@ class JpaPartialCancellationWriter(
         entityManager.merge(result.order)
         entityManager.merge(result.allocation)
         entityManager.merge(result.authorization)
-        entityManager.persist(result.ledgerEntry)
+        result.ledgerEntries.forEach(entityManager::persist)
         entityManager.flush()
         return result
     }

@@ -9,6 +9,7 @@ import com.pglab.payment.order.PaymentOrderStatus
 import com.pglab.payment.shared.Money
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.OffsetDateTime
 
 @Service
 class PartialCancellationService(
@@ -20,30 +21,25 @@ class PartialCancellationService(
         // 서비스는 그 결과를 원장과 상위 집계 상태에 반영하는 역할을 맡는다.
         command.authorization.cancel(command.cancelAmount)
 
-        // 취소는 기존 승인 기록을 덮어쓰지 않고 별도 원장 사실로 남긴다.
-        // 그래야 부분취소 누적 이력이 감사/정산 관점에서 추적 가능하다.
-        val ledgerEntry = LedgerEntry(
-            paymentOrder = command.order,
-            paymentAllocation = command.allocation,
-            authorization = command.authorization,
-            type = LedgerEntryType.CANCELLED,
-            amount = command.cancelAmount,
-            referenceTransactionId = command.authorization.pgTransactionId,
-            description = "partial cancellation",
-        )
+        val ledgerEntries = createLedgerEntries(command)
 
         // allocation 아래 여러 승인 수단이 있을 수 있으므로,
         // 특정 authorization 하나만 보고 상위 상태를 결정하면 안 된다.
         // 전체 authorization의 남은 취소 가능 잔액 합으로 상위 상태를 재집계한다.
-        val allocationRemaining = command.allAuthorizations.sumOf { it.remainingCancelableAmount.amount }
+        val allocationRemaining = command.allocationAuthorizations.sumOf { it.remainingCancelableAmount.amount }
+        val orderRemaining = command.orderAuthorizations.sumOf { it.remainingCancelableAmount.amount }
         if (allocationRemaining == 0L) {
             // 더 이상 취소 가능한 잔액이 없으면 allocation/order 전체가 사실상 모두 취소된 상태다.
             command.allocation.status = PaymentAllocationStatus.CANCELED
-            command.order.status = PaymentOrderStatus.CANCELED
         } else {
             // 일부 잔액이 남아 있으면 부분취소 상태를 유지한다.
             command.allocation.status = PaymentAllocationStatus.PARTIALLY_CANCELED
-            command.order.status = PaymentOrderStatus.PARTIALLY_CANCELED
+        }
+
+        command.order.status = if (orderRemaining == 0L) {
+            PaymentOrderStatus.CANCELED
+        } else {
+            PaymentOrderStatus.PARTIALLY_CANCELED
         }
 
         // 호출자는 반환된 authorization/ledger/order 상태를 그대로 후속 저장 또는 응답에 사용할 수 있다.
@@ -51,10 +47,72 @@ class PartialCancellationService(
             order = command.order,
             allocation = command.allocation,
             authorization = command.authorization,
-            ledgerEntry = ledgerEntry,
+            ledgerEntries = ledgerEntries,
         )
 
         return writer.save(result)
+    }
+
+    private fun createLedgerEntries(command: PartialCancellationCommand): List<LedgerEntry> {
+        val orderedLinePortions = command.authorization.linePortions
+            .sortedWith(compareBy<AuthorizationLinePortion>({ it.sequence }, { it.paymentOrderLine?.lineReference ?: "" }, { it.payeeId }))
+        require(orderedLinePortions.isNotEmpty()) {
+            "authorization line portions must exist for partial cancellation"
+        }
+
+        val existingNegativeAmountsByLineReference = command.existingNegativeLedgerEntries
+            .asSequence()
+            .filter { it.type == LedgerEntryType.CANCELLED || it.type == LedgerEntryType.REFUNDED }
+            .groupBy { it.paymentOrderLine?.lineReference ?: "${it.payeeId}#${it.referenceTransactionId}" }
+            .mapValues { (_, entries) -> entries.sumOf { it.amount.amount } }
+
+        val remainingAmountsByLineReference = orderedLinePortions.associate { linePortion ->
+            val lineReference = linePortion.paymentOrderLine?.lineReference ?: "${linePortion.payeeId}#${linePortion.sequence}"
+            lineReference to (linePortion.amount.amount - (existingNegativeAmountsByLineReference[lineReference] ?: 0L)).coerceAtLeast(0L)
+        }
+        val activeLineReferences = orderedLinePortions
+            .mapNotNull { linePortion ->
+                val lineReference = linePortion.paymentOrderLine?.lineReference ?: return@mapNotNull null
+                if ((remainingAmountsByLineReference[lineReference] ?: 0L) > 0L) lineReference else null
+            }
+        val totalRemainingAmount = activeLineReferences.sumOf { remainingAmountsByLineReference[it] ?: 0L }
+        require(command.cancelAmount.amount <= totalRemainingAmount) {
+            "cancel amount must not exceed remaining line portion amount"
+        }
+
+        val occurredAt = OffsetDateTime.now()
+        var remainingAmountToAssign = command.cancelAmount.amount
+        val lastActiveLineReference = activeLineReferences.lastOrNull()
+
+        return orderedLinePortions.mapNotNull { linePortion ->
+            val lineReference = linePortion.paymentOrderLine?.lineReference ?: "${linePortion.payeeId}#${linePortion.sequence}"
+            val remainingLineAmount = remainingAmountsByLineReference[lineReference] ?: 0L
+            val splitAmount = if (remainingLineAmount == 0L) {
+                0L
+            } else if (lineReference == lastActiveLineReference) {
+                remainingAmountToAssign
+            } else {
+                command.cancelAmount.amount * remainingLineAmount / totalRemainingAmount
+            }
+            remainingAmountToAssign -= splitAmount
+
+            if (splitAmount == 0L) {
+                return@mapNotNull null
+            }
+
+            LedgerEntry(
+                paymentOrder = command.order,
+                paymentAllocation = command.allocation,
+                authorization = command.authorization,
+                paymentOrderLine = linePortion.paymentOrderLine,
+                payeeId = linePortion.payeeId,
+                type = LedgerEntryType.CANCELLED,
+                amount = Money(splitAmount, command.cancelAmount.currency),
+                occurredAt = occurredAt,
+                referenceTransactionId = command.authorization.pgTransactionId,
+                description = "partial cancellation",
+            )
+        }
     }
 }
 
@@ -67,12 +125,14 @@ data class PartialCancellationCommand(
     val allocation: PaymentAllocation,
     val authorization: Authorization,
     val cancelAmount: Money,
-    val allAuthorizations: List<Authorization> = listOf(authorization),
+    val allocationAuthorizations: List<Authorization> = listOf(authorization),
+    val orderAuthorizations: List<Authorization> = allocationAuthorizations,
+    val existingNegativeLedgerEntries: List<LedgerEntry> = emptyList(),
 )
 
 data class PartialCancellationResult(
     val order: PaymentOrder,
     val allocation: PaymentAllocation,
     val authorization: Authorization,
-    val ledgerEntry: LedgerEntry,
+    val ledgerEntries: List<LedgerEntry>,
 )
