@@ -2,10 +2,12 @@ package com.pglab.payment.jpa
 
 import com.pglab.payment.allocation.PaymentAllocation
 import com.pglab.payment.authorization.Authorization
+import com.pglab.payment.authorization.AuthorizationLinePortion
 import com.pglab.payment.authorization.InstrumentType
 import com.pglab.payment.ledger.LedgerEntry
 import com.pglab.payment.ledger.LedgerEntryType
 import com.pglab.payment.order.PaymentOrder
+import com.pglab.payment.order.PaymentOrderLine
 import com.pglab.payment.settlement.Payout
 import com.pglab.payment.settlement.Settlement
 import com.pglab.payment.settlement.SettlementLine
@@ -13,6 +15,7 @@ import com.pglab.payment.shared.CurrencyCode
 import com.pglab.payment.shared.Money
 import org.junit.jupiter.api.assertThrows
 import jakarta.persistence.EntityManager
+import org.hibernate.PropertyValueException
 import org.hibernate.exception.ConstraintViolationException
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -29,6 +32,22 @@ class PaymentJpaMappingTest(
             merchantId = "merchant-1",
             merchantOrderId = "order-100",
             totalAmount = Money(50_000L, CurrencyCode.KRW),
+        )
+        order.addLine(
+            PaymentOrderLine(
+                lineReference = "line-1",
+                payeeId = "seller-A",
+                lineAmount = Money(30_000L, CurrencyCode.KRW),
+                quantity = 1,
+            ),
+        )
+        order.addLine(
+            PaymentOrderLine(
+                lineReference = "line-2",
+                payeeId = "seller-B",
+                lineAmount = Money(20_000L, CurrencyCode.KRW),
+                quantity = 2,
+            ),
         )
         entityManager.persist(order)
 
@@ -47,31 +66,48 @@ class PaymentJpaMappingTest(
             approvedAmount = Money(20_000L, CurrencyCode.KRW),
             pgTransactionId = "pg-tx-100",
         )
+        authorization.addLinePortion(
+            AuthorizationLinePortion(
+                paymentOrderLine = order.lines[0],
+                payeeId = order.lines[0].payeeId,
+                amount = Money(10_000L, CurrencyCode.KRW),
+                sequence = 1,
+            ),
+        )
+        authorization.addLinePortion(
+            AuthorizationLinePortion(
+                paymentOrderLine = order.lines[1],
+                payeeId = order.lines[1].payeeId,
+                amount = Money(10_000L, CurrencyCode.KRW),
+                sequence = 2,
+            ),
+        )
         entityManager.persist(authorization)
 
         val ledgerEntry = LedgerEntry(
             paymentOrder = order,
             paymentAllocation = allocation,
             authorization = authorization,
+            paymentOrderLine = order.lines[0],
+            payeeId = order.lines[0].payeeId,
             type = LedgerEntryType.AUTH_CAPTURED,
-            amount = Money(20_000L, CurrencyCode.KRW),
+            amount = Money(10_000L, CurrencyCode.KRW),
             referenceTransactionId = "pg-tx-100",
             description = "initial authorization",
         )
         entityManager.persist(ledgerEntry)
 
         val settlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "seller-A",
             grossAmount = Money(50_000L, CurrencyCode.KRW),
             feeAmount = Money(1_000L, CurrencyCode.KRW),
             netAmount = Money(49_000L, CurrencyCode.KRW),
         )
 
         val settlementLine = SettlementLine(
-            settlement = settlement,
             ledgerEntry = ledgerEntry,
         )
-        settlement.lines.add(settlementLine)
+        settlement.addLine(settlementLine)
 
         entityManager.persist(settlement)
 
@@ -89,12 +125,29 @@ class PaymentJpaMappingTest(
         entityManager.clear()
 
         assertNotNull(order.id)
+        order.lines.forEach { assertNotNull(it.id) }
         assertNotNull(allocation.id)
         assertNotNull(authorization.id)
+        authorization.linePortions.forEach { assertNotNull(it.id) }
         assertNotNull(ledgerEntry.id)
         assertNotNull(settlement.id)
         assertNotNull(payout.id)
         assertNotNull(settlementLine.id)
+    }
+
+    @Test
+    fun `상위 주문이 없는 주문 라인은 JPA로 저장할 수 없다`() {
+        val line = PaymentOrderLine(
+            lineReference = "line-without-order",
+            payeeId = "seller-A",
+            lineAmount = Money(10_000L, CurrencyCode.KRW),
+            quantity = 1,
+        )
+
+        assertThrows<PropertyValueException> {
+            entityManager.persist(line)
+            entityManager.flush()
+        }
     }
 
     @Test
@@ -108,6 +161,7 @@ class PaymentJpaMappingTest(
 
         val ledgerEntry = LedgerEntry(
             paymentOrder = order,
+            payeeId = "payee-1",
             type = LedgerEntryType.AUTH_CAPTURED,
             amount = Money(10_000L, CurrencyCode.KRW),
             referenceTransactionId = "dup-tx-1",
@@ -116,23 +170,23 @@ class PaymentJpaMappingTest(
         entityManager.persist(ledgerEntry)
 
         val firstSettlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "payee-1",
             grossAmount = Money(10_000L, CurrencyCode.KRW),
             feeAmount = Money(0L, CurrencyCode.KRW),
             netAmount = Money(10_000L, CurrencyCode.KRW),
         )
-        firstSettlement.lines.add(SettlementLine(settlement = firstSettlement, ledgerEntry = ledgerEntry))
+        firstSettlement.addLine(SettlementLine(ledgerEntry = ledgerEntry))
         entityManager.persist(firstSettlement)
         entityManager.flush()
 
         val secondSettlement = Settlement(
-            merchantId = "merchant-1",
+            payeeId = "payee-1",
             grossAmount = Money(10_000L, CurrencyCode.KRW),
             feeAmount = Money(0L, CurrencyCode.KRW),
             netAmount = Money(10_000L, CurrencyCode.KRW),
         )
         assertThrows<ConstraintViolationException> {
-            secondSettlement.lines.add(SettlementLine(settlement = secondSettlement, ledgerEntry = ledgerEntry))
+            secondSettlement.addLine(SettlementLine(ledgerEntry = ledgerEntry))
             entityManager.persist(secondSettlement)
             entityManager.flush()
         }
