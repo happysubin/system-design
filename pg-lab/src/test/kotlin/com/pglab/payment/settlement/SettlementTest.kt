@@ -72,6 +72,27 @@ class SettlementTest {
     }
 
     @Test
+    fun `정산은 다른 통화 원장 라인을 추가할 수 없다`() {
+        val settlement = Settlement(
+            payeeId = "payee-1",
+            grossAmount = Money(50_000L, CurrencyCode.KRW),
+            feeAmount = Money(1_000L, CurrencyCode.KRW),
+            netAmount = Money(49_000L, CurrencyCode.KRW),
+        )
+        val ledgerEntry = LedgerEntry(
+            payeeId = "payee-1",
+            type = LedgerEntryType.AUTH_CAPTURED,
+            amount = Money(10L, CurrencyCode.USD),
+            referenceTransactionId = "tx-usd-1",
+            description = "currency mismatch",
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            settlement.addLine(SettlementLine(ledgerEntry = ledgerEntry))
+        }
+    }
+
+    @Test
     fun `정산은 지급 처리를 시작하면 처리중 상태가 된다`() {
         val settlement = Settlement(
             payeeId = "payee-1",

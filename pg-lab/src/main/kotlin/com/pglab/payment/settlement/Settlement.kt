@@ -121,6 +121,9 @@ class Settlement(
         require(ledgerEntry.payeeId == payeeId) {
             "settlement line ledger entry payee must match settlement payee"
         }
+        require(ledgerEntry.amount.currency == grossAmount.currency) {
+            "settlement line ledger entry currency must match settlement currency"
+        }
         if (linesInternal.contains(line)) {
             return
         }
