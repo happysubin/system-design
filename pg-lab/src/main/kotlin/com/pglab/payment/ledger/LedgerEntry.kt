@@ -3,6 +3,7 @@ package com.pglab.payment.ledger
 import com.pglab.payment.allocation.PaymentAllocation
 import com.pglab.payment.authorization.Authorization
 import com.pglab.payment.order.PaymentOrder
+import com.pglab.payment.order.PaymentOrderLine
 import com.pglab.payment.shared.CurrencyCode
 import com.pglab.payment.shared.Money
 import jakarta.persistence.AttributeOverride
@@ -65,6 +66,11 @@ class LedgerEntry(
      * 승인, 취소, 환불처럼 승인 단위로 따라가야 하는 이벤트는 이 연결을 통해 추적한다.
      */
     var authorization: Authorization? = null,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_order_line_id")
+    var paymentOrderLine: PaymentOrderLine? = null,
+    @Column(nullable = false)
+    val payeeId: String = "",
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)
     /**
@@ -109,4 +115,20 @@ class LedgerEntry(
      * 장애 분석이나 수동 검토에서 엔트리 생성 배경을 파악하는 데 도움을 준다.
      */
     val description: String = "",
-)
+) {
+    init {
+        paymentOrderLine?.let { orderLine ->
+            require(payeeId == orderLine.payeeId) {
+                "ledger entry payee must match payment order line payee"
+            }
+            require(amount.currency == orderLine.lineAmount.currency) {
+                "ledger entry currency must match payment order line currency"
+            }
+            paymentOrder?.let { order ->
+                require(orderLine.paymentOrder == order) {
+                    "ledger entry payment order line must belong to the same payment order"
+                }
+            }
+        }
+    }
+}
