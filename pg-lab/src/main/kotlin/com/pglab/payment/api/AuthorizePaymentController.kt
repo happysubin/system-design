@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import java.time.OffsetDateTime
 
 @RestController
 @RequestMapping("/api/payments")
@@ -22,6 +23,14 @@ class AuthorizePaymentController(
             merchantId = request.merchantId,
             merchantOrderId = request.merchantOrderId,
             totalAmount = Money(request.totalAmount, CurrencyCode.valueOf(request.currency)),
+            lines = request.lines.map { line ->
+                com.pglab.payment.authorization.PaymentOrderLineRequest(
+                    lineReference = line.lineReference,
+                    payeeId = line.payeeId,
+                    lineAmount = Money(line.lineAmount, CurrencyCode.valueOf(request.currency)),
+                    quantity = line.quantity,
+                )
+            },
             allocations = request.allocations.map { allocation ->
                 AllocationAuthorizationRequest(
                     payerReference = allocation.payerReference,
@@ -33,6 +42,13 @@ class AuthorizePaymentController(
                             approvedAmount = Money(authorization.approvedAmount, CurrencyCode.valueOf(request.currency)),
                             pgTransactionId = authorization.pgTransactionId,
                             approvalCode = authorization.approvalCode,
+                            approvedAt = authorization.approvedAt,
+                            linePortions = authorization.linePortions.map { linePortion ->
+                                com.pglab.payment.authorization.AuthorizationLinePortionRequest(
+                                    lineReference = linePortion.lineReference,
+                                    amount = Money(linePortion.amount, CurrencyCode.valueOf(request.currency)),
+                                )
+                            },
                         )
                     },
                 )
@@ -57,7 +73,15 @@ data class AuthorizePaymentApiRequest(
     val merchantOrderId: String,
     val totalAmount: Long,
     val currency: String,
+    val lines: List<AuthorizePaymentOrderLineApiRequest>,
     val allocations: List<AuthorizePaymentAllocationApiRequest>,
+)
+
+data class AuthorizePaymentOrderLineApiRequest(
+    val lineReference: String,
+    val payeeId: String,
+    val lineAmount: Long,
+    val quantity: Int,
 )
 
 data class AuthorizePaymentAllocationApiRequest(
@@ -72,6 +96,13 @@ data class AuthorizePaymentAuthorizationApiRequest(
     val approvedAmount: Long,
     val pgTransactionId: String,
     val approvalCode: String? = null,
+    val approvedAt: OffsetDateTime? = null,
+    val linePortions: List<AuthorizePaymentAuthorizationLinePortionApiRequest>,
+)
+
+data class AuthorizePaymentAuthorizationLinePortionApiRequest(
+    val lineReference: String,
+    val amount: Long,
 )
 
 data class AuthorizePaymentApiResponse(
