@@ -12,7 +12,9 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
+import jakarta.persistence.CascadeType
 
 /**
  * 고객이나 가맹점이 인식하는 상위 결제 주문이다.
@@ -72,4 +74,27 @@ class PaymentOrder(
      * 주문 전체가 현재 어느 단계에 와 있는지 요약해서 보여주는 용도다.
      */
     var status: PaymentOrderStatus = PaymentOrderStatus.READY,
-)
+    @OneToMany(mappedBy = "paymentOrderInternal", cascade = [CascadeType.ALL], orphanRemoval = true)
+    private val linesInternal: MutableList<PaymentOrderLine> = mutableListOf(),
+) {
+    val lines: List<PaymentOrderLine>
+        get() = linesInternal
+
+    fun addLine(line: PaymentOrderLine) {
+        require(line.paymentOrder == null || line.paymentOrder == this) {
+            "payment order line already belongs to another payment order"
+        }
+        if (linesInternal.contains(line)) {
+            return
+        }
+
+        line.attachTo(this)
+        linesInternal.add(line)
+    }
+
+    fun removeLine(line: PaymentOrderLine) {
+        if (linesInternal.remove(line)) {
+            line.detach()
+        }
+    }
+}
